@@ -12,6 +12,30 @@ export default function ArenaTopbar() {
   const targetChain = parseInt(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID ?? "61999");
   const onCorrectChain = chainId === targetChain;
 
+  const switchToStudionet = async () => {
+    if (!window.ethereum) return;
+    const chainHex = `0x${targetChain.toString(16)}`;
+    try {
+      await (window.ethereum as any).request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainHex }],
+      });
+    } catch (err: any) {
+      // Chain not added yet — add it
+      if (err.code === 4902) {
+        await (window.ethereum as any).request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: chainHex,
+            chainName: "GenLayer Studionet",
+            rpcUrls: ["https://studio.genlayer.com/api"],
+            nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
+          }],
+        });
+      }
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b-4 border-[#121212] bg-[#FFE600] shadow-[0_4px_0px_#121212]">
       <div className="mx-auto max-w-7xl flex items-center justify-between px-4 py-2 gap-4">
@@ -50,7 +74,12 @@ export default function ArenaTopbar() {
           {isConnected && (
             <>
               {!onCorrectChain && (
-                <Badge variant="unsafe">Wrong Chain</Badge>
+                <button
+                  onClick={switchToStudionet}
+                  className="text-xs font-black uppercase bg-[#FF3B30] text-white border-2 border-[#121212] px-2 py-0.5 shadow-[2px_2px_0px_#121212] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+                >
+                  Wrong Chain — Switch
+                </button>
               )}
               {onCorrectChain && (
                 <Badge variant="safe">
