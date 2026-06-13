@@ -1,26 +1,47 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #FFF8E7;
+  --foreground: #121212;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #FFF8E7;
+  color: #121212;
+  font-family: "DM Sans", sans-serif;
 }
+
+/* Scrollbar — zine style */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #D8D0BF; }
+::-webkit-scrollbar-thumb { background: #121212; border: 1px solid #D8D0BF; }
+
+/* Torn-paper border */
+.torn-top {
+  clip-path: polygon(0% 0%,3% 2%,6% 0%,9% 2%,12% 0%,15% 2%,18% 0%,21% 2%,24% 0%,27% 2%,30% 0%,33% 2%,36% 0%,39% 2%,42% 0%,45% 2%,48% 0%,51% 2%,54% 0%,57% 2%,60% 0%,63% 2%,66% 0%,69% 2%,72% 0%,75% 2%,78% 0%,81% 2%,84% 0%,87% 2%,90% 0%,93% 2%,96% 0%,99% 2%,100% 0%,100% 100%,0% 100%);
+}
+
+/* Halftone */
+.halftone-bg {
+  background-image: radial-gradient(#12121212 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+/* Misprint shadow */
+.misprint-shadow {
+  box-shadow: 4px 4px 0px rgba(0,87,255,0.28), 8px 8px 0px rgba(18,18,18,0.08);
+}
+
+/* Rotate stamps */
+.stamp-1 { transform: rotate(-1deg); }
+.stamp-2 { transform: rotate(1.5deg); }
+.stamp-3 { transform: rotate(-0.5deg); }
+
+@keyframes glitch {
+  0%,100% { transform: translate(0); }
+  20% { transform: translate(-2px,1px); }
+  40% { transform: translate(2px,-1px); }
+  60% { transform: translate(-1px,2px); }
+  80% { transform: translate(1px,-2px); }
+}
+.glitch:hover { animation: glitch 0.3s steps(4) infinite; }
