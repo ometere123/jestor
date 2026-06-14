@@ -23,6 +23,10 @@ export const metadata: Metadata = {
   title: "Jestor — GenLayer Meme Balance Arena",
   description:
     "Jestor is a GenLayer-native arena where jokes, captions, roasts, and chaos actions mutate internal toy balances through transparent Intelligent Contract verdicts.",
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
