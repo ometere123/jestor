@@ -32,25 +32,25 @@ export function assert(condition, msg) {
 }
 
 export function assertEqual(a, b, msg) {
-  if (a !== b) throw new AssertionError(`ASSERT FAILED: ${msg} — got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`);
+  if (a !== b) throw new AssertionError(`ASSERT FAILED: ${msg} - got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`);
 }
 
 export function assertIn(val, allowed, msg) {
   if (!allowed.includes(val)) {
-    throw new AssertionError(`ASSERT FAILED: ${msg} — "${val}" not in [${allowed.join(", ")}]`);
+    throw new AssertionError(`ASSERT FAILED: ${msg} - "${val}" not in [${allowed.join(", ")}]`);
   }
 }
 
 export function assertInRange(val, min, max, msg) {
   const n = Number(val);
   if (isNaN(n) || n < min || n > max) {
-    throw new AssertionError(`ASSERT FAILED: ${msg} — ${val} not in [${min}, ${max}]`);
+    throw new AssertionError(`ASSERT FAILED: ${msg} - ${val} not in [${min}, ${max}]`);
   }
 }
 
 export function assertNonEmpty(val, msg) {
   if (!val || (typeof val === "string" && val.trim().length === 0)) {
-    throw new AssertionError(`ASSERT FAILED: ${msg} — value is empty`);
+    throw new AssertionError(`ASSERT FAILED: ${msg} - value is empty`);
   }
 }
 

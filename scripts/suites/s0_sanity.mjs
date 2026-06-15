@@ -1,5 +1,5 @@
 /**
- * Step 0 — Sanity check.
+ * Step 0 - Sanity check.
  * Verifies RPC is reachable and both wallets have native token balance.
  */
 
@@ -9,7 +9,7 @@ import { callRead, shortAddr } from "../lib/helpers.mjs";
 export async function runSanity() {
   console.log("\n── STEP 0: Sanity ──────────────────────────────────────────");
 
-  // 1. RPC reachable — read contract stats
+  // 1. RPC reachable - read contract stats
   let stats;
   try {
     stats = await callRead(clientA, "get_protocol_stats");
@@ -28,7 +28,7 @@ export async function runSanity() {
     }
     console.log(`  Wallet ${label} (${shortAddr(addr)}) native balance: ${bal}`);
     if (bal === 0n) {
-      throw new Error(`Wallet ${label} (${addr}) has zero native balance — fund it on Studionet before running tests.`);
+      throw new Error(`Wallet ${label} (${addr}) has zero native balance - fund it on Studionet before running tests.`);
     }
   }
 

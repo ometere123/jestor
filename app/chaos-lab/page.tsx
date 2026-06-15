@@ -44,7 +44,7 @@ export default function ChaosLabPage() {
       logAction("INVOKE_CHAOS", "Chaos action submitted to JestoraArena");
       logAction("SAFETY", "Financial and harm checks passed");
       logAction("GENLAYER", "_judge_chaos invoked");
-      logAction("VALIDATORS", "Chaos class equivalence check — awaiting consensus");
+      logAction("VALIDATORS", "Chaos class equivalence check, awaiting consensus");
       setTraces(getTraces());
       setTxStatus("Sending to GenLayer...");
 
@@ -67,7 +67,7 @@ export default function ChaosLabPage() {
         logAction("BALANCE", `${delta >= 0 ? "+" : ""}${delta} Jest Points applied`);
         logAction("EVENT", "ChaosFeed updated");
       } else {
-        logAction("CONSENSUS", "Judged — verdict stored on-chain");
+        logAction("CONSENSUS", "Judged, verdict stored on-chain");
         logAction("EVENT", "ChaosFeed updated");
       }
       setTraces(getTraces());

@@ -1,7 +1,7 @@
 "use client";
 
 // Local session cache for recent verdicts and console traces.
-// Stored in sessionStorage only — cleared on tab close.
+// Stored in sessionStorage only, cleared on tab close.
 
 import type { ConsoleTrace } from "../genlayer/types";
 

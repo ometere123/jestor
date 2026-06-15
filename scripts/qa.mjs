@@ -1,5 +1,5 @@
 /**
- * Jestor Contract QA Script — v2 (debug mode)
+ * Jestor Contract QA Script - v2 (debug mode)
  */
 
 import { createClient, createAccount } from "genlayer-js";
@@ -49,9 +49,9 @@ async function write(client, method, args, label) {
     const statusNum = receipt?.status ?? receipt?.statusName;
     const statusName = typeof statusNum === "number" ? STATUS_NAMES[statusNum] : statusNum;
     const execNum = receipt?.txExecutionResult;
-    const execName = typeof execNum === "number" ? EXEC_NAMES[execNum] : (receipt?.txExecutionResultName ?? "—");
-    const resultName = receipt?.resultName ?? receipt?.result ?? "—";
-    const final = receipt?.consensus_data?.final ?? "—";
+    const execName = typeof execNum === "number" ? EXEC_NAMES[execNum] : (receipt?.txExecutionResultName ?? "-");
+    const resultName = receipt?.resultName ?? receipt?.result ?? "-";
+    const final = receipt?.consensus_data?.final ?? "-";
 
     console.log(`${INFO} status: ${statusName} (${statusNum})`);
     console.log(`${INFO} exec:   ${execName}`);
@@ -90,7 +90,7 @@ async function read(client, method, args, label) {
 // ---------------------------------------------------------------------------
 async function main() {
   console.log("=".repeat(60));
-  console.log("  JESTOR CONTRACT QA — Studionet");
+  console.log("  JESTOR CONTRACT QA - Studionet");
   console.log(`  Contract : ${CONTRACT}`);
   console.log(`  Alias    : ${ALIAS}`);
   console.log("=".repeat(60));
@@ -115,7 +115,7 @@ async function main() {
     assert(p && Object.keys(p).length > 0, "profile created");
     assert(p?.alias === ALIAS || typeof p?.alias === "string", `alias set: ${p?.alias}`);
   } else {
-    console.log(`\n[TEST 1] SKIPPED — profile already exists: alias="${existingProfile.alias}"`);
+    console.log(`\n[TEST 1] SKIPPED - profile already exists: alias="${existingProfile.alias}"`);
   }
 
   // ── 2. get_balance ───────────────────────────────────────────────────────
@@ -135,7 +135,7 @@ async function main() {
   console.log(`${INFO} prompt id to use: ${promptId ?? "(none)"}`);
 
   if (!promptId) {
-    console.log("  ⚠ No active prompt — skipping caption/duel tests that need a prompt id");
+    console.log("  ⚠ No active prompt - skipping caption/duel tests that need a prompt id");
   }
 
   // ── 4. submit_caption ───────────────────────────────────────────────────
@@ -145,7 +145,7 @@ async function main() {
     const bal1 = await read(client, "get_balance", [addr], "balance_after_caption");
     console.log(`${INFO} balance after caption: ${bal1}`);
   } else {
-    // Use empty string prompt id — contract will handle missing prompt gracefully
+    // Use empty string prompt id - contract will handle missing prompt gracefully
     await write(client, "submit_caption", ["", "My portfolio is just vibes and copium at this point"], "submit_caption (no prompt)");
   }
 
@@ -202,7 +202,7 @@ async function main() {
   console.log(`${INFO} stats: ${JSON.stringify(stats)}`);
 
   // ── 11. Error: caption too short ─────────────────────────────────────────
-  console.log("\n[TEST 11] submit_caption with text < 5 chars — should fail");
+  console.log("\n[TEST 11] submit_caption with text < 5 chars - should fail");
   const shortResult = await write(client, "submit_caption", [promptId ?? "", "lol"], "submit_caption (too short)");
   assert(shortResult?.succeeded === false, "correctly rejected short caption");
 

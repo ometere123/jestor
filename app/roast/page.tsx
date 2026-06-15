@@ -34,7 +34,7 @@ export default function RoastPage() {
       logAction("SUBMIT_ROAST", "Submitting self-roast to JestoraArena");
       logAction("SAFETY", "Playfulness and safety check initiated");
       logAction("GENLAYER", "_judge_roast invoked");
-      logAction("VALIDATORS", "Checking roast is self-directed and safe — awaiting consensus");
+      logAction("VALIDATORS", "Checking roast is self-directed and safe, awaiting consensus");
       setTraces(getTraces());
       setTxStatus("Sending to GenLayer...");
 
@@ -52,7 +52,7 @@ export default function RoastPage() {
         logAction("CAP", `delta ${v.actual_delta ?? v.balance_delta} within roast_max 40`);
         logAction("BALANCE", `+${v.actual_delta ?? v.balance_delta} Jest Points applied`);
       } else {
-        logAction("CONSENSUS", "Judged — verdict stored on-chain");
+        logAction("CONSENSUS", "Judged, verdict stored on-chain");
       }
       setTraces(getTraces());
       setTxStatus("");
@@ -102,7 +102,7 @@ export default function RoastPage() {
         <div className="border-2 border-dashed border-[#C99A6B] p-3 text-xs text-[#6B6257]">
           <p className="font-black mb-1">Self-roast rules:</p>
           <ul className="space-y-0.5 list-disc list-inside">
-            <li>Roast only yourself — your balance, captions, or meme choices.</li>
+            <li>Roast only yourself: your balance, captions, or meme choices.</li>
             <li>No attacks on other users, protected classes, or real-world people.</li>
             <li>No self-harm encouragement. Playful only.</li>
             <li>GenLayer validators judge playfulness and safety before any reward.</li>

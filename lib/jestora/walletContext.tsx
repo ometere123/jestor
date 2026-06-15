@@ -56,7 +56,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setError(null);
   }, []);
 
-  // Restore session on mount without prompting — MetaMask already has permission
+  // Restore session on mount without prompting, MetaMask already has permission
   useEffect(() => {
     if (typeof window === "undefined" || !window.ethereum) return;
     (window.ethereum.request({ method: "eth_accounts" }) as Promise<string[]>)

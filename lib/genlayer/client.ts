@@ -6,7 +6,7 @@ import { studionet } from "genlayer-js/chains";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_CONTRACT === "true";
 
 // ---------------------------------------------------------------------------
-// Read client — ephemeral account, no signing needed
+// Read client - ephemeral account, no signing needed
 // ---------------------------------------------------------------------------
 let _readClient: ReturnType<typeof createClient> | null = null;
 
@@ -24,7 +24,7 @@ export function getReadClient() {
 export const getGenLayerClient = getReadClient;
 
 // ---------------------------------------------------------------------------
-// Write client — uses window.ethereum so MetaMask signs the tx
+// Write client - uses window.ethereum so MetaMask signs the tx
 // ---------------------------------------------------------------------------
 export async function getWriteClient() {
   if (typeof window === "undefined") {
@@ -33,7 +33,7 @@ export async function getWriteClient() {
   if (!window.ethereum) {
     throw new Error("No wallet provider found. Please install MetaMask.");
   }
-  // Request the currently connected account — MetaMask returns [] if not connected
+  // Request the currently connected account - MetaMask returns [] if not connected
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const accounts = await (window.ethereum as any).request({ method: "eth_accounts" }) as string[];
   const account = accounts?.[0];

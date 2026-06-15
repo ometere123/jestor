@@ -44,10 +44,10 @@ export default function CaptionRiftPage() {
     setBalanceBefore(before);
 
     try {
-      logAction("SUBMIT_CAPTION", `Round: ${selectedPrompt.id} — submitting`);
+      logAction("SUBMIT_CAPTION", `Round: ${selectedPrompt.id}, submitting`);
       logAction("SAFETY", "Client pre-flight safety check passed");
       logAction("GENLAYER", "_judge_caption invoked on JestoraArena");
-      logAction("VALIDATORS", "Humour equivalence check — awaiting consensus");
+      logAction("VALIDATORS", "Humour equivalence check, awaiting consensus");
       setTraces(getTraces());
       setValidatorState("running");
       setTxStatus("Sending to GenLayer...");
@@ -69,10 +69,10 @@ export default function CaptionRiftPage() {
         logAction("CAP", `requested ${v.raw_delta_requested ?? v.balance_delta}, capped to ${v.actual_delta ?? v.balance_delta}`);
         logAction("BALANCE", `+${v.actual_delta ?? v.balance_delta} Jest Points applied`);
       } else {
-        // Receipt didn't include verdict — compute delta from balance diff
+        // Receipt didn't include verdict, compute delta from balance diff
         const after = updatedProfile?.balance ?? before;
         const delta = after - before;
-        logAction("CONSENSUS", "Judged — verdict stored on-chain");
+        logAction("CONSENSUS", "Judged, verdict stored on-chain");
         logAction("BALANCE", `${delta >= 0 ? "+" : ""}${delta} Jest Points applied`);
       }
       logAction("EVENT", "ChaosFeed updated");
@@ -117,7 +117,7 @@ export default function CaptionRiftPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left — input */}
+          {/* Left - input */}
           <div className="space-y-4">
             <div className="border-4 border-[#121212] bg-white p-4 shadow-[4px_4px_0px_#121212]">
               <p className="text-xs font-black uppercase tracking-widest text-[#6B6257] mb-3">
@@ -151,7 +151,7 @@ export default function CaptionRiftPage() {
             </div>
           </div>
 
-          {/* Right — verdict + console */}
+          {/* Right - verdict + console */}
           <div className="space-y-4">
             {verdict && (
               <div className="border-4 border-[#121212] bg-white p-4 shadow-[4px_4px_0px_#121212]">

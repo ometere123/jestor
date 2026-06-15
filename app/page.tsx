@@ -136,7 +136,7 @@ export default function LandingPage() {
             </div>
             <div>
               <p className="font-black text-[#121212] mb-1">Validators agree on structured verdicts.</p>
-              <p>Jestor uses fixed JSON schemas so validators reach consensus reliably — then the contract applies deterministic caps.</p>
+              <p>Jestor uses fixed JSON schemas so validators reach consensus reliably, then the contract applies deterministic caps.</p>
             </div>
             <div>
               <p className="font-black text-[#121212] mb-1">Every balance change is traceable.</p>
@@ -149,7 +149,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t-4 border-[#121212] bg-[#121212] text-[#D8D0BF] px-4 py-6 mt-12">
         <div className="max-w-5xl mx-auto text-xs font-mono space-y-1">
-          <p className="font-black text-[#FFE600]">JESTOR — GenLayer Meme Balance Arena</p>
+          <p className="font-black text-[#FFE600]">JESTOR - GenLayer Meme Balance Arena</p>
           <p>Jest Points are internal toy balances for gameplay and experimentation only.</p>
           <p>Not tokens. Not securities. Not investments. Not tradable. Not withdrawable. No monetary value.</p>
           <p className="text-[#6B6257]">Built on GenLayer Studionet. No external AI APIs used.</p>

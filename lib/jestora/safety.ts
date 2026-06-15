@@ -1,5 +1,5 @@
 // Client-side pre-flight safety checks before hitting the contract.
-// These are NOT replacements for contract-level safety — they just give faster UX feedback.
+// These are NOT replacements for contract-level safety, they just give faster UX feedback.
 
 const HARD_BLOCKED_PATTERNS = [
   /\b(kill|murder|rape|suicide|bomb|terrorist)\b/i,

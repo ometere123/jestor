@@ -73,7 +73,7 @@ export default function DuelsPage() {
   const handleResolve = async (duelId: string) => {
     if (!address) return;
     setIsLoading(true);
-    setTxStatus("Resolving duel — waiting for consensus...");
+    setTxStatus("Resolving duel, waiting for consensus...");
     try {
       await resolveDuel(address, duelId);
       setTxStatus("Reading result...");

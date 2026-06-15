@@ -1,4 +1,4 @@
-// Deterministic balance cap rules — mirrors the contract caps exactly.
+// Deterministic balance cap rules, mirrors the contract caps exactly.
 // These are used for frontend display and validation only.
 // The contract enforces the actual caps on-chain.
 

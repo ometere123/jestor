@@ -29,7 +29,7 @@ export default function RulesPage() {
           <h2 className="font-['Rubik_Mono_One',monospace] text-xl text-[#0057FF] mb-3">What GenLayer Judges</h2>
           <div className="space-y-2 text-sm text-[#6B6257]">
             {[
-              ["Caption Rift", "Humour score, originality score, prompt fit, safety class, and meme style — all judged by AI-validator consensus."],
+              ["Caption Rift", "Humour score, originality score, prompt fit, safety class, and meme style, all judged by AI-validator consensus."],
               ["Roast Balance", "Playfulness score, safety class, and whether the roast is self-directed and harmless."],
               ["Meme Duel", "Which entry better fits the prompt based on humour, originality, safety, and creativity."],
               ["Chaos Action", "Whether the action is valid, what chaos class to assign, and what harmless toy mutation to apply."],

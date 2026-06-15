@@ -11,7 +11,7 @@ body {
   font-family: "DM Sans", sans-serif;
 }
 
-/* Scrollbar — zine style */
+/* Scrollbar - zine style */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: #D8D0BF; }
 ::-webkit-scrollbar-thumb { background: #121212; border: 1px solid #D8D0BF; }

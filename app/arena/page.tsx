@@ -56,7 +56,7 @@ export default function ArenaPage() {
     } catch (e: unknown) {
       const msg = (e as Error).message ?? "";
       if (msg.toLowerCase().includes("already exists") || msg.toLowerCase().includes("already")) {
-        // Profile exists on-chain but wasn't loaded — just fetch it
+        // Profile exists on-chain but wasn't loaded, just fetch it
         setCreateStatus("Profile found! Loading...");
       } else {
         setCreateError(msg || "Failed to create profile.");

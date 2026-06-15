@@ -1,4 +1,4 @@
-# Jestor — GenLayer Meme Balance Arena
+# Jestor - GenLayer Meme Balance Arena
 
 > **Riso Meme Zine** UI identity. GenLayer-native. No external AI. No financial mechanics.
 
@@ -52,7 +52,7 @@ Never show: USD price, token chart, swap, liquidity, APY, yield, market cap, buy
 cd jestor
 npm install
 cp .env.example .env.local
-# Edit .env.local — set NEXT_PUBLIC_USE_MOCK_CONTRACT=true for local dev
+# Edit .env.local, set NEXT_PUBLIC_USE_MOCK_CONTRACT=true for local dev
 npm run dev
 ```
 
@@ -103,7 +103,7 @@ Stack: Next.js App Router, TypeScript, Tailwind CSS, GenLayer JS, Viem, Framer M
 ## Safety Rules
 
 - No targeted harassment, hate speech, self-harm encouragement, or financial claims
-- Unsafe submissions are blocked by GenLayer safety classification — no balance reward
+- Unsafe submissions are blocked by GenLayer safety classification, no balance reward
 - All safety checking runs through the contract, not the frontend
 
 ---

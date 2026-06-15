@@ -47,9 +47,9 @@ async function main() {
   const summary = [];
   let ctx = {};
 
-  // Step 0 — always runs (sanity cannot be filtered)
+  // Step 0 - always runs (sanity cannot be filtered)
   {
-    const r = await timed("Step 0 — Sanity", runSanity);
+    const r = await timed("Step 0 - Sanity", runSanity);
     summary.push({ name: "Step 0 Sanity", ...r });
     if (!r.ok) {
       console.error("Aborting: sanity check failed.");
@@ -59,7 +59,7 @@ async function main() {
 
   // Suite 1
   if (shouldRun("s1")) {
-    const r = await timed("Suite 1 — Deterministic", runDeterministic, ctx);
+    const r = await timed("Suite 1 - Deterministic", runDeterministic, ctx);
     summary.push({ name: "Suite 1 Deterministic", ...r });
     if (!r.ok) { printSummary(summary); process.exit(1); }
     // Pass shared state (promptId) to later suites
@@ -68,14 +68,14 @@ async function main() {
 
   // Suite 2
   if (shouldRun("s2")) {
-    const r = await timed("Suite 2 — Reverts", () => runReverts(ctx), ctx);
+    const r = await timed("Suite 2 - Reverts", () => runReverts(ctx), ctx);
     summary.push({ name: "Suite 2 Reverts", ...r });
     if (!r.ok) { printSummary(summary); process.exit(1); }
   }
 
   // Suite 3
   if (shouldRun("s3")) {
-    const r = await timed("Suite 3 — Non-deterministic", () => runNonDet(ctx), ctx);
+    const r = await timed("Suite 3 - Non-deterministic", () => runNonDet(ctx), ctx);
     summary.push({ name: "Suite 3 Nondet", ...r });
     if (!r.ok) { printSummary(summary); process.exit(1); }
   }
@@ -91,7 +91,7 @@ function printSummary(summary) {
   console.log("╚══════════════════════════════════════════════════════════╝");
   for (const { name, ok, s, error } of summary) {
     const icon = ok ? "✅" : "❌";
-    const note = ok ? "" : ` — ${error?.slice(0, 60)}`;
+    const note = ok ? "" : ` - ${error?.slice(0, 60)}`;
     console.log(`  ${icon} ${name.padEnd(32)} ${s}s${note}`);
   }
   console.log();

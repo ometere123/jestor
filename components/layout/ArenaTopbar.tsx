@@ -21,7 +21,7 @@ export default function ArenaTopbar() {
         params: [{ chainId: chainHex }],
       });
     } catch (err: any) {
-      // Chain not added yet — add it
+      // Chain not added yet, add it
       if (err.code === 4902) {
         await (window.ethereum as any).request({
           method: "wallet_addEthereumChain",
@@ -78,7 +78,7 @@ export default function ArenaTopbar() {
                   onClick={switchToStudionet}
                   className="text-xs font-black uppercase bg-[#FF3B30] text-white border-2 border-[#121212] px-2 py-0.5 shadow-[2px_2px_0px_#121212] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
                 >
-                  Wrong Chain — Switch
+                  Wrong Chain - Switch
                 </button>
               )}
               {onCorrectChain && (

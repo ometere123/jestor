@@ -25,7 +25,7 @@ export interface WriteResult {
 }
 
 // ---------------------------------------------------------------------------
-// Verdict extraction — parse from leader_receipt eq_outputs (non-det result)
+// Verdict extraction - parse from leader_receipt eq_outputs (non-det result)
 // ---------------------------------------------------------------------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractReturnValueFromReceipt(receipt: any): unknown | null {
@@ -62,11 +62,11 @@ function extractVerdictFromReceipt(receipt: any): Record<string, unknown> | null
         if (v && typeof v === "object" && !Array.isArray(v)) {
           return v as Record<string, unknown>;
         }
-        // String — try JSON.parse, also try fixing missing commas
+        // String - try JSON.parse, also try fixing missing commas
         if (typeof v === "string") {
           const attempts = [
             v,
-            // GenLayer Studio display strips commas between values — add them back
+            // GenLayer Studio display strips commas between values, add them back
             v.replace(/("|\d|true|false|null)"/g, '$1,"'),
             v.replace(/("|\d|true|false|null)(\s*")/g, '$1,$2'),
           ];
@@ -107,7 +107,7 @@ async function callRead(method: string, args: Arg[] = []): Promise<unknown> {
 }
 
 // ---------------------------------------------------------------------------
-// Write helper — signs with MetaMask, waits for consensus, extracts verdict
+// Write helper - signs with MetaMask, waits for consensus, extracts verdict
 // ---------------------------------------------------------------------------
 async function callWrite(
   _senderAddress: string,
@@ -131,7 +131,7 @@ async function callWrite(
     value: BigInt(0),
   });
 
-  // Use the read client (GenLayer-native account) to wait for the receipt —
+  // Use the read client (GenLayer-native account) to wait for the receipt -
   // it returns the full GenLayer receipt including consensus_data + eq_outputs.
   // The MetaMask write client returns a standard ETH receipt without those fields.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -185,7 +185,7 @@ export async function createPrompt(sender: string, promptText: string): Promise<
 // View methods
 // ---------------------------------------------------------------------------
 export async function getProfile(address: string): Promise<PlayerProfile | null> {
-  // Try checksummed first, then lowercase — contract stores via str(gl.message.sender_address)
+  // Try checksummed first, then lowercase - contract stores via str(gl.message.sender_address)
   // which may be lowercase depending on the GenLayer runtime version.
   for (const addr of [address, address.toLowerCase()]) {
     const result = await callRead("get_profile", [addr]);
