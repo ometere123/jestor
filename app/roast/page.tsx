@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import ArenaShell from "@/components/layout/ArenaShell";
 import RoastInputPanel from "@/components/roast/RoastInputPanel";
 import RoastVerdictCard from "@/components/roast/RoastVerdictCard";
@@ -9,23 +9,20 @@ import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
 import { submitRoastSelf, getProfile } from "@/lib/genlayer/contract";
 import { logAction, saveLastVerdict, getTraces } from "@/lib/jestora/localCache";
-import type { RoastVerdict, ConsoleTrace, PlayerProfile } from "@/lib/genlayer/types";
+import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
+import type { RoastVerdict, ConsoleTrace } from "@/lib/genlayer/types";
 
 export default function RoastPage() {
-  const { address, isConnected } = useWallet();
+  const { address } = useWallet();
+  const { profile, setProfile, isCheckingProfile } = useRequireProfile();
   const [verdict, setVerdict] = useState<RoastVerdict | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [traces, setTraces] = useState<ConsoleTrace[]>([]);
-  const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [txStatus, setTxStatus] = useState("");
 
-  useEffect(() => {
-    if (address) getProfile(address).then(setProfile);
-  }, [address]);
-
   const handleSubmit = async (text: string) => {
-    if (!address) return;
+    if (!address || !profile) return;
     setIsLoading(true);
     setError("");
     setVerdict(null);
@@ -68,6 +65,11 @@ export default function RoastPage() {
   return (
     <ArenaShell>
       <div className="max-w-3xl mx-auto space-y-6">
+        {address && isCheckingProfile && (
+          <div className="border-2 border-[#0057FF] bg-white p-4 text-sm font-mono text-[#6B6257]">
+            Checking profile on-chain...
+          </div>
+        )}
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="font-['Rubik_Mono_One',monospace] text-3xl text-[#121212]">Roast Balance</h1>
           <Badge variant="unsafe">Self-Roast Only</Badge>

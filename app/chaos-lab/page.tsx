@@ -6,39 +6,42 @@ import ChaosActionForm from "@/components/chaos/ChaosActionForm";
 import ChaosVerdictPanel from "@/components/chaos/ChaosVerdictPanel";
 import ChaosWheel from "@/components/chaos/ChaosWheel";
 import ConsensusTrace from "@/components/console/ConsensusTrace";
+import StructuredVerdict from "@/components/console/StructuredVerdict";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
 import { invokeChaosAction, getProfile } from "@/lib/genlayer/contract";
 import { logAction, saveLastVerdict, getTraces } from "@/lib/jestora/localCache";
-import type { ChaosVerdict, ConsoleTrace, PlayerProfile } from "@/lib/genlayer/types";
+import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
+import type { ChaosVerdict, ConsoleTrace } from "@/lib/genlayer/types";
 
 const LAST_CHAOS_KEY = "jestor_last_chaos_day";
 
 export default function ChaosLabPage() {
   const { address } = useWallet();
+  const { profile, setProfile, isCheckingProfile } = useRequireProfile();
   const [verdict, setVerdict] = useState<ChaosVerdict | null>(null);
+  const [structuredVerdict, setStructuredVerdict] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [traces, setTraces] = useState<ConsoleTrace[]>([]);
-  const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [hasUsedToday, setHasUsedToday] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [txStatus, setTxStatus] = useState("");
 
   useEffect(() => {
     if (!address) return;
-    getProfile(address).then(setProfile);
     const today = new Date().toDateString();
     const lastUsed = localStorage.getItem(LAST_CHAOS_KEY + address);
     setHasUsedToday(lastUsed === today);
   }, [address]);
 
   const handleSubmit = async (text: string) => {
-    if (!address) return;
+    if (!address || !profile) return;
     setIsLoading(true);
     setSpinning(true);
     setError("");
     setVerdict(null);
+    setStructuredVerdict(null);
     setTxStatus("");
     try {
       logAction("INVOKE_CHAOS", "Chaos action submitted to JestoraArena");
@@ -48,16 +51,13 @@ export default function ChaosLabPage() {
       setTraces(getTraces());
       setTxStatus("Sending to GenLayer...");
 
-      const { verdict: receiptVerdict } = await invokeChaosAction(address, text);
+      const { verdict: receiptVerdict, rawVerdict } = await invokeChaosAction(address, text);
       setTxStatus("Consensus reached. Reading verdict...");
-
+      setStructuredVerdict(receiptVerdict ?? null);
       const updatedProfile = await getProfile(address);
       setProfile(updatedProfile);
 
-      if (
-        receiptVerdict &&
-        typeof receiptVerdict.chaos_class === "string"
-      ) {
+      if (receiptVerdict && typeof receiptVerdict.chaos_class === "string") {
         const v = receiptVerdict as unknown as ChaosVerdict;
         setVerdict(v);
         saveLastVerdict(v);
@@ -67,6 +67,9 @@ export default function ChaosLabPage() {
         logAction("BALANCE", `${delta >= 0 ? "+" : ""}${delta} Jest Points applied`);
         logAction("EVENT", "ChaosFeed updated");
       } else {
+        if (rawVerdict && typeof rawVerdict === "object" && !Array.isArray(rawVerdict)) {
+          setStructuredVerdict(rawVerdict as Record<string, unknown>);
+        }
         logAction("CONSENSUS", "Judged, verdict stored on-chain");
         logAction("EVENT", "ChaosFeed updated");
       }
@@ -88,6 +91,11 @@ export default function ChaosLabPage() {
   return (
     <ArenaShell>
       <div className="max-w-3xl mx-auto space-y-6">
+        {address && isCheckingProfile && (
+          <div className="border-2 border-[#0057FF] bg-white p-4 text-sm font-mono text-[#6B6257]">
+            Checking profile on-chain...
+          </div>
+        )}
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="font-['Rubik_Mono_One',monospace] text-3xl text-[#121212]">Chaos Lab</h1>
           <Badge variant="chaos">1 Per Day</Badge>
@@ -113,6 +121,7 @@ export default function ChaosLabPage() {
         </div>
 
         {verdict && <ChaosVerdictPanel verdict={verdict} />}
+        {structuredVerdict && <StructuredVerdict verdict={structuredVerdict} title="Consensus Verdict JSON" />}
         {!verdict && traces.some((t) => t.step === "CONSENSUS") && (
           <div className="border-2 border-[#35E36D] bg-white p-4 text-sm font-mono text-[#6B6257]">
             Chaos judged on-chain. Check your balance above for the result.

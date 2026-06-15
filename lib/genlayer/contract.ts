@@ -21,6 +21,7 @@ type Arg = any;
 export interface WriteResult {
   hash: string;
   verdict: Record<string, unknown> | null;
+  rawVerdict: unknown | null;
   returnValue: unknown | null;
 }
 
@@ -47,6 +48,15 @@ function extractReturnValueFromReceipt(receipt: any): unknown | null {
   }
 }
 
+function repairLooseJson(raw: string): string {
+  let repaired = raw.trim();
+  repaired = repaired.replace(/,\s*([}\]])/g, "$1");
+  repaired = repaired.replace(/(:\s*-?\d+(?:\.\d+)?)(?=\s*")/g, "$1,");
+  repaired = repaired.replace(/(:\s*true|:\s*false|:\s*null)(?=\s*")/g, "$1,");
+  repaired = repaired.replace(/(")(?=\s*")/g, '$1,');
+  return repaired;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractVerdictFromReceipt(receipt: any): Record<string, unknown> | null {
   try {
@@ -66,6 +76,7 @@ function extractVerdictFromReceipt(receipt: any): Record<string, unknown> | null
         if (typeof v === "string") {
           const attempts = [
             v,
+            repairLooseJson(v),
             // GenLayer Studio display strips commas between values, add them back
             v.replace(/("|\d|true|false|null)"/g, '$1,"'),
             v.replace(/("|\d|true|false|null)(\s*")/g, '$1,$2'),
@@ -116,7 +127,7 @@ async function callWrite(
 ): Promise<WriteResult> {
   if (USE_MOCK) {
     const hash = await mockContract.write(method, args, _senderAddress);
-    return { hash, verdict: null, returnValue: null };
+    return { hash, verdict: null, rawVerdict: null, returnValue: null };
   }
 
   const writeClient = await getWriteClient();
@@ -142,8 +153,9 @@ async function callWrite(
   });
 
   const verdict = extractVerdictFromReceipt(receipt);
+  const rawVerdict = receipt?.consensus_data?.leader_receipt?.[0]?.eq_outputs ?? null;
   const returnValue = extractReturnValueFromReceipt(receipt);
-  return { hash: hash as string, verdict, returnValue };
+  return { hash: hash as string, verdict, rawVerdict, returnValue };
 }
 
 // ---------------------------------------------------------------------------

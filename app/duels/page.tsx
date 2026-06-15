@@ -7,17 +7,19 @@ import DuelCard from "@/components/duels/DuelCard";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
 import { startDuel, joinDuel, resolveDuel, getDuel, getLatestDuelId } from "@/lib/genlayer/contract";
+import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
 import type { Duel } from "@/lib/genlayer/types";
 
 export default function DuelsPage() {
   const { address } = useWallet();
+  const { profile, isCheckingProfile } = useRequireProfile();
   const [isLoading, setIsLoading] = useState(false);
   const [activeDuels, setActiveDuels] = useState<Duel[]>([]);
   const [error, setError] = useState("");
   const [txStatus, setTxStatus] = useState("");
 
   const handleCreateDuel = async (promptId: string, entry: string) => {
-    if (!address) return;
+    if (!address || !profile) return;
     setIsLoading(true);
     setError("");
     setTxStatus("Sending to GenLayer...");
@@ -53,7 +55,7 @@ export default function DuelsPage() {
   };
 
   const handleJoin = async (duelId: string, entry: string) => {
-    if (!address) return;
+    if (!address || !profile) return;
     setIsLoading(true);
     setTxStatus("Joining duel on GenLayer...");
     try {
@@ -71,7 +73,7 @@ export default function DuelsPage() {
   };
 
   const handleResolve = async (duelId: string) => {
-    if (!address) return;
+    if (!address || !profile) return;
     setIsLoading(true);
     setTxStatus("Resolving duel, waiting for consensus...");
     try {
@@ -93,6 +95,11 @@ export default function DuelsPage() {
   return (
     <ArenaShell>
       <div className="max-w-5xl mx-auto space-y-6">
+        {address && isCheckingProfile && (
+          <div className="border-2 border-[#0057FF] bg-white p-4 text-sm font-mono text-[#6B6257]">
+            Checking profile on-chain...
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <h1 className="font-['Rubik_Mono_One',monospace] text-3xl text-[#121212]">Meme Duels</h1>
           <Badge variant="purple">GenLayer Judged</Badge>

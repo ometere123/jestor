@@ -10,12 +10,14 @@ import BalanceMutationPanel from "@/components/console/BalanceMutationPanel";
 import ValidatorMoodGrid from "@/components/console/ValidatorMoodGrid";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { submitCaption, getProfile, getActivePrompts } from "@/lib/genlayer/contract";
+import { submitCaption, getActivePrompts, getProfile } from "@/lib/genlayer/contract";
 import { logAction, saveLastVerdict, getTraces } from "@/lib/jestora/localCache";
-import type { Prompt, CaptionVerdict, ConsoleTrace, PlayerProfile } from "@/lib/genlayer/types";
+import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
+import type { Prompt, CaptionVerdict, ConsoleTrace } from "@/lib/genlayer/types";
 
 export default function CaptionRiftPage() {
   const { address, isConnected, connect } = useWallet();
+  const { profile, setProfile, isCheckingProfile } = useRequireProfile();
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [verdict, setVerdict] = useState<CaptionVerdict | null>(null);
@@ -23,18 +25,16 @@ export default function CaptionRiftPage() {
   const [error, setError] = useState("");
   const [traces, setTraces] = useState<ConsoleTrace[]>([]);
   const [validatorState, setValidatorState] = useState<"idle" | "running" | "consensus">("idle");
-  const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [balanceBefore, setBalanceBefore] = useState<number | undefined>();
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txStatus, setTxStatus] = useState("");
 
   useEffect(() => {
     getActivePrompts().then(setPrompts);
-    if (address) getProfile(address).then(setProfile);
-  }, [address]);
+  }, []);
 
   const handleSubmit = async (caption: string) => {
-    if (!address || !selectedPrompt) return;
+    if (!address || !selectedPrompt || !profile) return;
     setIsLoading(true);
     setError("");
     setVerdict(null);
@@ -98,6 +98,17 @@ export default function CaptionRiftPage() {
           <button onClick={connect} className="w-full bg-[#FFE600] border-2 border-[#121212] px-4 py-2 font-black uppercase text-sm shadow-[3px_3px_0px_#121212]">
             Connect
           </button>
+        </div>
+      </ArenaShell>
+    );
+  }
+
+  if (address && isCheckingProfile) {
+    return (
+      <ArenaShell>
+        <div className="max-w-md mx-auto mt-20 text-center space-y-4">
+          <p className="font-['Rubik_Mono_One',monospace] text-2xl">Checking Profile</p>
+          <p className="text-sm text-[#6B6257]">Looking for your on-chain profile...</p>
         </div>
       </ArenaShell>
     );
