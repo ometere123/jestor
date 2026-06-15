@@ -1,10 +1,7 @@
 /**
- * Suite 2 — Deterministic revert paths.
+ * Suite 2 - Deterministic revert paths.
  * For every raise / validation check in the contract, builds a scenario
  * that triggers it and asserts execution_result === "ERROR" on-chain.
- * Also asserts no state change occurred after each revert.
- *
- * Uses a fresh alias per run. Uses a throwaway account for "no profile" tests.
  */
 
 import { createAccount, createClient } from "genlayer-js";
@@ -12,222 +9,188 @@ import { studionet } from "genlayer-js/chains";
 import { clientA, clientB, ADDR_A, ADDR_B } from "../lib/clients.mjs";
 import {
   callWrite, callRead,
-  CONTRACT, assert, assertEqual,
-  shortAddr, sleep,
+  assert, assertEqual,
+  shortAddr,
 } from "../lib/helpers.mjs";
 
-// Throwaway wallet with no profile
 const throwaway = createAccount();
 const clientT = createClient({ chain: studionet, account: throwaway });
 
 const TAG = Date.now().toString(36).toUpperCase();
-const ALIAS_C = `S2C_${TAG}`;          // fresh alias for wallet A in this suite
-const PROMPT_TEXT = `Revert suite prompt S2_${TAG} — long enough to pass`;
+const PROMPT_TEXT = `Revert suite prompt S2_${TAG} - long enough to pass`;
 
 export async function runReverts({ promptId: existingPromptId }) {
-  console.log("── SUITE 2: Revert paths ───────────────────────────────────");
+  console.log("-- SUITE 2: Revert paths -----------------------------------");
   const results = [];
 
-  // ── Setup: ensure wallet A has a profile and a prompt ─────────────────────
-  // (Wallet A already has a profile from Suite 1 — get its alias from chain)
   const existingA = await callRead(clientA, "get_profile", [ADDR_A]);
   assert(existingA && existingA.alias, "Wallet A has a profile (prereq)");
 
-  // Use the prompt from Suite 1 if available, else create a new one
   let promptId = existingPromptId;
   if (!promptId) {
     const r = await callWrite(clientA, "create_prompt", [PROMPT_TEXT], `A(${shortAddr(ADDR_A)})`);
     assert(r.ok, "setup: create prompt");
     const prompts = await callRead(clientA, "get_active_prompts");
-    promptId = prompts.find(p => p.text === PROMPT_TEXT)?.id;
+    promptId = prompts.find((p) => p.text === PROMPT_TEXT)?.id;
     assert(promptId, "setup: prompt id found");
   }
 
-  // ── 2.1 create_profile — alias too short ──────────────────────────────────
   {
     const statsB4 = await callRead(clientA, "get_protocol_stats");
-    const r = await callWrite(clientT, "create_profile", ["x"], `T(throwaway)`);
+    const r = await callWrite(clientT, "create_profile", ["x"], "T(throwaway)");
     assert(!r.ok, "alias='x' must revert");
     assert(r.error.toLowerCase().includes("alias") || r.error.toLowerCase().includes("2"), `stderr mentions alias length: ${r.error}`);
     const statsAf = await callRead(clientA, "get_protocol_stats");
     assertEqual(statsAf?.total_profiles, statsB4?.total_profiles, "total_profiles unchanged after revert");
-    results.push("2.1 create_profile alias<2 → ERROR ✓");
+    results.push("2.1 create_profile alias<2 -> ERROR OK");
   }
 
-  // ── 2.2 create_profile — alias too long ───────────────────────────────────
   {
-    const longAlias = "A".repeat(33);
-    const r = await callWrite(clientT, "create_profile", [longAlias], `T(throwaway)`);
+    const r = await callWrite(clientT, "create_profile", ["A".repeat(33)], "T(throwaway)");
     assert(!r.ok, "33-char alias must revert");
-    results.push("2.2 create_profile alias>32 → ERROR ✓");
+    results.push("2.2 create_profile alias>32 -> ERROR OK");
   }
 
-  // ── 2.3 create_profile — duplicate ────────────────────────────────────────
   {
-    // Wallet A already has a profile — try to create again
     const r = await callWrite(clientA, "create_profile", ["NewAlias"], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "duplicate create_profile must revert");
-    assert(r.error.toLowerCase().includes("already"), `stderr mentions 'already': ${r.error}`);
+    assert(r.error.toLowerCase().includes("already"), `stderr mentions already: ${r.error}`);
     const profile = await callRead(clientA, "get_profile", [ADDR_A]);
     assertEqual(profile?.alias, existingA?.alias, "alias unchanged after duplicate attempt");
-    results.push("2.3 create_profile duplicate → ERROR ✓");
+    results.push("2.3 create_profile duplicate -> ERROR OK");
   }
 
-  // ── 2.4 create_prompt — no profile ────────────────────────────────────────
   {
-    const r = await callWrite(clientT, "create_prompt", ["A prompt with enough text to pass length check"], `T(throwaway)`);
+    const r = await callWrite(clientT, "create_prompt", ["A prompt with enough text to pass length check"], "T(throwaway)");
     assert(!r.ok, "create_prompt with no profile must revert");
-    assert(r.error.toLowerCase().includes("profile"), `stderr mentions 'profile': ${r.error}`);
-    results.push("2.4 create_prompt no-profile → ERROR ✓");
+    assert(r.error.toLowerCase().includes("profile"), `stderr mentions profile: ${r.error}`);
+    results.push("2.4 create_prompt no-profile -> ERROR OK");
   }
 
-  // ── 2.5 create_prompt — text too short ────────────────────────────────────
   {
     const r = await callWrite(clientA, "create_prompt", ["Too short"], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "create_prompt text<10 must revert");
-    results.push("2.5 create_prompt text<10 → ERROR ✓");
+    results.push("2.5 create_prompt text<10 -> ERROR OK");
   }
 
-  // ── 2.6 create_prompt — text too long ────────────────────────────────────
   {
-    const longText = "x".repeat(301);
-    const r = await callWrite(clientA, "create_prompt", [longText], `A(${shortAddr(ADDR_A)})`);
+    const r = await callWrite(clientA, "create_prompt", ["x".repeat(301)], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "create_prompt text>300 must revert");
-    results.push("2.6 create_prompt text>300 → ERROR ✓");
+    results.push("2.6 create_prompt text>300 -> ERROR OK");
   }
 
-  // ── 2.7 submit_caption — no profile ──────────────────────────────────────
   {
-    const r = await callWrite(clientT, "submit_caption", [promptId, "A valid caption that is long enough"], `T(throwaway)`);
+    const r = await callWrite(clientT, "submit_caption", [promptId, "A valid caption that is long enough"], "T(throwaway)");
     assert(!r.ok, "submit_caption with no profile must revert");
-    assert(r.error.toLowerCase().includes("profile"), `stderr mentions 'profile': ${r.error}`);
-    results.push("2.7 submit_caption no-profile → ERROR ✓");
+    assert(r.error.toLowerCase().includes("profile"), `stderr mentions profile: ${r.error}`);
+    results.push("2.7 submit_caption no-profile -> ERROR OK");
   }
 
-  // ── 2.8 submit_caption — caption too short ────────────────────────────────
   {
     const r = await callWrite(clientA, "submit_caption", [promptId, "lol"], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "submit_caption caption<5 must revert");
-    results.push("2.8 submit_caption caption<5 → ERROR ✓");
+    results.push("2.8 submit_caption caption<5 -> ERROR OK");
   }
 
-  // ── 2.9 submit_caption — caption too long ────────────────────────────────
   {
     const r = await callWrite(clientA, "submit_caption", [promptId, "x".repeat(501)], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "submit_caption caption>500 must revert");
-    results.push("2.9 submit_caption caption>500 → ERROR ✓");
+    results.push("2.9 submit_caption caption>500 -> ERROR OK");
   }
 
-  // ── 2.10 submit_roast_self — no profile ──────────────────────────────────
   {
-    const r = await callWrite(clientT, "submit_roast_self", ["A roast that is long enough to pass"], `T(throwaway)`);
+    const r = await callWrite(clientT, "submit_roast_self", ["A roast that is long enough to pass"], "T(throwaway)");
     assert(!r.ok, "submit_roast_self no-profile must revert");
-    results.push("2.10 submit_roast_self no-profile → ERROR ✓");
+    results.push("2.10 submit_roast_self no-profile -> ERROR OK");
   }
 
-  // ── 2.11 submit_roast_self — too short ───────────────────────────────────
   {
     const r = await callWrite(clientA, "submit_roast_self", ["bad"], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "submit_roast_self text<5 must revert");
-    results.push("2.11 submit_roast_self text<5 → ERROR ✓");
+    results.push("2.11 submit_roast_self text<5 -> ERROR OK");
   }
 
-  // ── 2.12 submit_roast_self — too long ────────────────────────────────────
   {
     const r = await callWrite(clientA, "submit_roast_self", ["x".repeat(401)], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "submit_roast_self text>400 must revert");
-    results.push("2.12 submit_roast_self text>400 → ERROR ✓");
+    results.push("2.12 submit_roast_self text>400 -> ERROR OK");
   }
 
-  // ── 2.13 invoke_chaos_action — no profile ────────────────────────────────
   {
-    const r = await callWrite(clientT, "invoke_chaos_action", ["A valid chaos action text length"], `T(throwaway)`);
+    const r = await callWrite(clientT, "invoke_chaos_action", ["A valid chaos action text length"], "T(throwaway)");
     assert(!r.ok, "invoke_chaos_action no-profile must revert");
-    results.push("2.13 invoke_chaos_action no-profile → ERROR ✓");
+    results.push("2.13 invoke_chaos_action no-profile -> ERROR OK");
   }
 
-  // ── 2.14 invoke_chaos_action — too short ─────────────────────────────────
   {
     const r = await callWrite(clientA, "invoke_chaos_action", ["x"], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "invoke_chaos_action action<5 must revert");
-    results.push("2.14 invoke_chaos_action action<5 → ERROR ✓");
+    results.push("2.14 invoke_chaos_action action<5 -> ERROR OK");
   }
 
-  // ── 2.15 invoke_chaos_action — too long ──────────────────────────────────
   {
     const r = await callWrite(clientA, "invoke_chaos_action", ["x".repeat(301)], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "invoke_chaos_action action>300 must revert");
-    results.push("2.15 invoke_chaos_action action>300 → ERROR ✓");
+    results.push("2.15 invoke_chaos_action action>300 -> ERROR OK");
   }
 
-  // ── 2.16 start_duel — no profile ─────────────────────────────────────────
   {
-    const r = await callWrite(clientT, "start_duel", [promptId, "A valid entry long enough here"], `T(throwaway)`);
+    const r = await callWrite(clientT, "start_duel", [promptId, "A valid entry long enough here"], "T(throwaway)");
     assert(!r.ok, "start_duel no-profile must revert");
-    results.push("2.16 start_duel no-profile → ERROR ✓");
+    results.push("2.16 start_duel no-profile -> ERROR OK");
   }
 
-  // ── 2.17 start_duel — entry too short ────────────────────────────────────
   {
     const r = await callWrite(clientA, "start_duel", [promptId, "lol"], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "start_duel entry<5 must revert");
-    results.push("2.17 start_duel entry<5 → ERROR ✓");
+    results.push("2.17 start_duel entry<5 -> ERROR OK");
   }
 
-  // ── 2.18 join_duel — duel not found ──────────────────────────────────────
   {
     const r = await callWrite(clientB, "join_duel", ["nonexistent_duel_id", "A valid joining entry"], `B(${shortAddr(ADDR_B)})`);
     assert(!r.ok, "join_duel unknown id must revert");
     assert(r.error.toLowerCase().includes("not found") || r.error.toLowerCase().includes("duel"), `stderr: ${r.error}`);
-    results.push("2.18 join_duel not-found → ERROR ✓");
+    results.push("2.18 join_duel not-found -> ERROR OK");
   }
 
-  // ── 2.19 resolve_duel — duel not found ───────────────────────────────────
   {
     const r = await callWrite(clientA, "resolve_duel", ["bogus_duel_id_xyz"], `A(${shortAddr(ADDR_A)})`);
     assert(!r.ok, "resolve_duel unknown id must revert");
-    results.push("2.19 resolve_duel not-found → ERROR ✓");
+    results.push("2.19 resolve_duel not-found -> ERROR OK");
   }
 
-  // ── 2.20 cooldown — submit_caption twice quickly ─────────────────────────
-  // Use wallet B (fresh caption cooldown). Submit once (will trigger nondet + set CD),
-  // then immediately submit again — second call must hit the 30s CD.
-  // NOTE: First call IS nondet; we just need it to succeed to set the CD timer.
-  // We use a fresh unique caption to avoid duplicate-hash error.
   {
-    const CAP1 = `Cooldown test first submission S2_${TAG}`;
-    const CAP2 = `Cooldown test second submission immediately S2_${TAG}`;
-    const r1 = await callWrite(clientB, "submit_caption", [promptId, CAP1], `B(${shortAddr(ADDR_B)})`);
-    // r1 is nondet — may succeed or fail. Either way:
+    const cap1 = `Cooldown test first submission S2_${TAG}`;
+    const cap2 = `Cooldown test second submission immediately S2_${TAG}`;
+    const r1 = await callWrite(clientB, "submit_caption", [promptId, cap1], `B(${shortAddr(ADDR_B)})`);
     if (r1.ok) {
-      // Immediately try again — should hit the 30s cooldown
-      const r2 = await callWrite(clientB, "submit_caption", [promptId, CAP2], `B(${shortAddr(ADDR_B)}) [CD test]`);
+      const r2 = await callWrite(clientB, "submit_caption", [promptId, cap2], `B(${shortAddr(ADDR_B)}) [CD test]`);
       if (!r2.ok) {
         assert(r2.error.toLowerCase().includes("cooldown") || r2.error.toLowerCase().includes("wait"), `CD error: ${r2.error}`);
-        results.push("2.20 caption cooldown (30s) → ERROR ✓");
+        results.push("2.20 caption cooldown (30s) -> ERROR OK");
       } else {
-        results.push("2.20 caption cooldown: ⚠ second call succeeded (CD expired or hash-deduped) — skipped");
+        results.push("2.20 caption cooldown: second call succeeded - skipped");
       }
     } else {
-      results.push("2.20 caption cooldown: ⚠ first nondet call failed — skipped CD assertion");
+      results.push("2.20 caption cooldown: first nondet call failed - skipped");
     }
   }
 
-  // ── 2.21 resolve_duel — duel not ready (still "waiting") ─────────────────
-  // Start a duel with A, don't join — then try to resolve it.
   {
-    const ENTRY = `Waiting duel entry for revert test S2_${TAG}`;
-    const rStart = await callWrite(clientA, "start_duel", [promptId, ENTRY], `A(${shortAddr(ADDR_A)})`);
+    const entry = `Waiting duel entry for revert test S2_${TAG}`;
+    const rStart = await callWrite(clientA, "start_duel", [promptId, entry], `A(${shortAddr(ADDR_A)})`);
     if (rStart.ok) {
-      // We don't know the duel id — contract doesn't expose it in the receipt.
-      // Skip the resolve test as we can't look up the id without a view method.
-      results.push("2.21 resolve_duel not-ready: ⚠ duel id not retrievable — skipped");
+      const duelId = await callRead(clientA, "get_latest_duel_id", [ADDR_A]);
+      assert(!!duelId, "latest duel id available after start_duel");
+      const rResolve = await callWrite(clientA, "resolve_duel", [duelId], `A(${shortAddr(ADDR_A)}) [not-ready]`);
+      assert(!rResolve.ok, "resolve_duel on waiting duel must revert");
+      assert(rResolve.error.toLowerCase().includes("not ready"), `stderr mentions not ready: ${rResolve.error}`);
+      results.push("2.21 resolve_duel not-ready -> ERROR OK");
     } else {
-      results.push("2.21 resolve_duel not-ready: ⚠ start_duel failed (cooldown?) — skipped");
+      results.push("2.21 resolve_duel not-ready: start_duel failed (cooldown?) - skipped");
     }
   }
 
-  // ── Summary ───────────────────────────────────────────────────────────────
-  console.log(`\n  SUITE 2 SUMMARY:`);
+  console.log("\n  SUITE 2 SUMMARY:");
   for (const r of results) console.log(`    ${r}`);
 }
