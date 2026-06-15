@@ -1,133 +1,151 @@
-# Jestor - GenLayer Meme Balance Arena
+# Jestor — GenLayer Meme Balance Arena
 
-> **Riso Meme Zine** UI identity. GenLayer-native. No external AI. No financial mechanics.
-
----
-
-## What Jestor Is
-
-**Jestor** is a GenLayer-native experimental meme arena where users submit jokes, captions, roasts, and chaos actions.
-A GenLayer **Intelligent Contract** (`JestoraArena`) uses AI-validator consensus to judge submissions and apply
-capped mutations to internal toy balances called **Jest Points**.
-
-Jestor is **not** a memecoin, not a DeFi product, not a token sale, and not an investment platform.
-It is a playful demonstration of **non-deterministic social game logic** powered by GenLayer.
+> A GenLayer Intelligent Contract that uses AI-validator consensus to judge humour, roasts, chaos actions, and meme duels. No external AI APIs. All non-deterministic logic runs on-chain.
 
 ---
 
-## Why Humour Needs Non-Deterministic Consensus
+## Live Demo
 
-Normal smart contracts are deterministic: they execute the same way for the same inputs.
-That works for token transfers and arithmetic. It does not work for humour.
-
-Humour is subjective, context-dependent, and qualitative. No amount of deterministic code can reliably judge comedic originality.
-
-GenLayer solves this. Its Intelligent Contracts use LLM-based AI validators that reach consensus on qualitative judgements.
-
-Jestor uses GenLayer for:
-1. Interpreting meme text and captions
-2. Classifying humour style (ABSURDIST, DRY, CHAOTIC, WHOLESOME, SATIRE, META, LOW_EFFORT)
-3. Detecting unsafe or harmful content
-4. Judging whether a caption fits a prompt
-5. Selecting structured outcomes (ABSURD_GENIUS, CLEAN_HIT, SMALL_LAUGH, etc.)
-6. Mutating internal toy balances based on consensus verdicts
-7. Judging duel winners
-8. Approving or rejecting chaos actions
+**App:** https://jestor.vercel.app  
+**Contract:** `0x87B900cAF8f13Ee077D57aCd0C08E9b3F62002d4`  
+**Network:** GenLayer Studionet (chainId 61999)  
+**RPC:** `https://studio.genlayer.com/api`
 
 ---
 
-## What Jest Points Are (And Are Not)
+## The Non-Deterministic Core
 
-Jest Points ARE: internal toy balances, gameplay scores, non-transferable (MVP), for experimentation only.
+This is the reason Jestor needs GenLayer. Four contract functions make qualitative LLM judgements that no deterministic smart contract can replicate:
 
-Jest Points ARE NOT: real tokens, ERC20, tradable, withdrawable, securities, investments, or financial instruments.
+### 1. `_judge_caption` — Caption Rift
+```python
+gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+```
+Given a prompt and a user's caption, AI validators independently score:
+- Humour (0–100), Originality (0–100), Prompt Fit (0–100)
+- Meme style: `ABSURDIST | DRY | CHAOTIC | WHOLESOME | SATIRE | META | LOW_EFFORT`
+- Outcome: `ABSURD_GENIUS | CLEAN_HIT | SMALL_LAUGH | TRY_AGAIN | TOO_DERIVATIVE | BLOCKED`
+- Safety: `SAFE | UNSAFE | TARGETED_ABUSE | HATE | SEXUAL | SELF_HARM | SPAM`
+- Balance delta: 0–80 Jest Points
 
-Never show: USD price, token chart, swap, liquidity, APY, yield, market cap, buy/sell, airdrop, or investment language.
+### 2. `_judge_roast` — Roast Balance
+```python
+gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+```
+AI validators evaluate a self-roast for playfulness and safety:
+- Playfulness (0–100), Humour (0–100)
+- Outcome: `HUMBLE_PIE | BRUTAL_BUT_SAFE | TRY_AGAIN | BLOCKED`
+- Balance delta: 0–40 Jest Points
+
+### 3. `_judge_chaos` — Chaos Lab
+```python
+gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+```
+AI validators classify a chaos action declaration:
+- Chaos class: `BLESSING | CURSE | MIRROR | CONFETTI | NULL_EVENT`
+- Generates a title and flavor text from the action content
+- Balance delta: −25 to +75 Jest Points
+
+### 4. `_judge_duel` — Meme Duels
+```python
+gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
+```
+Two players submit entries to the same prompt. AI validators pick the winner:
+- Winner: `A | B | DRAW | NO_CONTEST`
+- Entry A score (0–100), Entry B score (0–100)
+- Written reasoning
+- Per-player balance deltas: winner up to +60, loser up to +10
 
 ---
 
-## Setup Commands
+## Equivalence Principle
+
+All four judge functions use **schema validation** as the equivalence principle — not `strict_eq`. The validator function checks that the leader's output conforms to an expected JSON schema (enum membership, numeric ranges, required string fields). This ensures consensus is reached on the *structure* of the verdict, not the exact wording, which is appropriate for free-text LLM outputs.
+
+```python
+def validator_fn(leader_result: str) -> bool:
+    data = json.loads(leader_result)
+    return (
+        isinstance(data, dict)
+        and data.get("outcome") in VALID_OUTCOMES
+        and 0 <= data.get("balance_delta", -1) <= 80
+        and isinstance(data.get("reason"), str)
+        # ... full schema check
+    )
+```
+
+---
+
+## Contract Overview
+
+**File:** `contract/jestor_arena.py`  
+**Class:** `JestoraArena(gl.Contract)`
+
+| Method | Type | Description |
+|---|---|---|
+| `create_profile(alias)` | write (det) | Register a player alias on-chain |
+| `create_prompt(text)` | write (det) | Submit a meme prompt |
+| `submit_caption(prompt_id, caption)` | write + **nondet** | Judge a caption via AI consensus |
+| `submit_roast_self(text)` | write + **nondet** | Judge a self-roast via AI consensus |
+| `invoke_chaos_action(text)` | write + **nondet** | Judge a chaos action via AI consensus |
+| `start_duel(prompt_id, entry)` | write (det) | Open a duel challenge |
+| `join_duel(duel_id, entry)` | write (det) | Accept a duel |
+| `resolve_duel(duel_id)` | write + **nondet** | Judge duel winner via AI consensus |
+| `get_profile(address)` | view | Read player profile + balance |
+| `get_leaderboard()` | view | Top 50 players by Jest Points |
+| `get_chaos_feed(limit)` | view | Recent AI verdicts across all players |
+| `get_protocol_stats()` | view | Total profiles, duels, submissions |
+
+---
+
+## Jest Points
+
+Jest Points are **internal toy balances** — gameplay scores only.
+
+- Not tokens. Not ERC20. Not tradable. Not withdrawable.
+- No monetary value. No financial prizes.
+- Deterministic caps enforced in contract code (never overridden by LLM):
+  - Caption: max +80 | Roast: max +40 | Duel win: max +60 | Chaos: −25 to +75
+  - Daily gain cap: +180 | Daily loss cap: −50
+
+---
+
+## Running Locally
 
 ```bash
-cd jestor
 npm install
-cp .env.example .env.local
-# Edit .env.local, set NEXT_PUBLIC_USE_MOCK_CONTRACT=true for local dev
+# Create .env.local:
+# NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS=0x87B900cAF8f13Ee077D57aCd0C08E9b3F62002d4
+# NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999
+# NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
+# NEXT_PUBLIC_USE_MOCK_CONTRACT=false
 npm run dev
 ```
 
----
-
-## Environment Variables
-
-```env
-NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS=   # Set after deploying JestoraArena
-NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999      # GenLayer Studionet chain ID
-NEXT_PUBLIC_GENLAYER_RPC_URL=http://localhost:4000/api
-NEXT_PUBLIC_USE_MOCK_CONTRACT=false      # true for mock mode (no contract needed)
-```
+Connect MetaMask to GenLayer Studionet (chainId 61999). The app has a one-click network switch button if you're on the wrong chain.
 
 ---
 
-## Contract Deployment Notes
-
-Contract is at `contract/jestor_arena.py`.
-
-1. Start GenLayer Studionet locally
-2. Deploy `contract/jestor_arena.py` via Studionet UI or CLI
-3. Copy the deployed contract address to `NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS`
-4. Set `NEXT_PUBLIC_USE_MOCK_CONTRACT=false`
-
-Register these prompt IDs in Studionet (see prompt definitions in `jestor_arena.py`):
-- `review_caption`
-- `review_self_roast`
-- `review_duel`
-- `review_chaos_action`
-- `review_safety`
-
----
-
-## Frontend Setup
+## Running the Test Suite
 
 ```bash
-npm install
-npm run dev        # http://localhost:3000
-npm run build
-npm run lint
+GL_PK1=0x... GL_PK2=0x... node scripts/test-all.mjs
 ```
 
-Stack: Next.js App Router, TypeScript, Tailwind CSS, GenLayer JS, Viem, Framer Motion, Zod, Lucide React, date-fns.
+Four suites:
+- **s0** — Sanity: RPC reachable, both wallets funded
+- **s1** — Deterministic happy path: profiles, prompts, duels, leaderboard
+- **s2** — 21 revert paths: validation errors, cooldowns, duplicates
+- **s3** — Non-deterministic: all 4 AI-judged functions with schema validation
 
 ---
 
-## Safety Rules
+## Stack
 
-- No targeted harassment, hate speech, self-harm encouragement, or financial claims
-- Unsafe submissions are blocked by GenLayer safety classification, no balance reward
-- All safety checking runs through the contract, not the frontend
-
----
-
-## Demo Walkthrough
-
-```
-1. Open http://localhost:3000
-2. Connect MetaMask (injected wallet)
-3. Click "Enter Arena"
-4. Create a profile alias
-5. Go to Caption Rift → select a prompt → submit a caption
-6. Watch the consensus trace: [SUBMIT_CAPTION] → [SAFETY] → [GENLAYER] → [VALIDATORS] → [CONSENSUS] → [CAP] → [BALANCE]
-7. See the structured JSON verdict with humour, originality, and safety scores
-8. Open Consensus Console to inspect the full trace and cap proof
-9. Try Roast Balance or Chaos Lab
-10. Open Rules page to verify non-financial boundaries
-```
-
----
-
-## Non-Financial Disclaimer
-
-Jestor uses internal toy balances for gameplay and experimentation only.
-Jest Points are not tokens, not securities, not investments, not tradable,
-not withdrawable, and have no monetary value. No external AI APIs are used.
-All judgement comes from GenLayer Intelligent Contract execution.
+| Layer | Tech |
+|---|---|
+| Intelligent Contract | Python, `genlayer`, `gl.vm.run_nondet_unsafe` |
+| Frontend | Next.js 15, TypeScript, Tailwind CSS |
+| Wallet | MetaMask (injected), GenLayer JS SDK |
+| Chain | GenLayer Studionet (chainId 61999) |
+| No external AI | All LLM judgement via GenLayer validator consensus |
