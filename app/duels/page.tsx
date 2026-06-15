@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ArenaShell from "@/components/layout/ArenaShell";
 import DuelCreateForm from "@/components/duels/DuelCreateForm";
 import DuelCard from "@/components/duels/DuelCard";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { startDuel, joinDuel, resolveDuel, getDuel, getLatestDuelId } from "@/lib/genlayer/contract";
+import { startDuel, joinDuel, resolveDuel, getDuel, getLatestDuelId, getOpenDuels, getAllDuels } from "@/lib/genlayer/contract";
 import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
 import type { Duel } from "@/lib/genlayer/types";
 
@@ -17,6 +17,32 @@ export default function DuelsPage() {
   const [activeDuels, setActiveDuels] = useState<Duel[]>([]);
   const [error, setError] = useState("");
   const [txStatus, setTxStatus] = useState("");
+  const [loadingDuels, setLoadingDuels] = useState(true);
+
+  const refreshDuels = useCallback(async () => {
+    try {
+      const [open, all] = await Promise.all([getOpenDuels(), getAllDuels()]);
+      const resolved = all.filter(d =>
+        d.status !== "waiting" &&
+        (d.player_a?.toLowerCase() === address?.toLowerCase() ||
+         d.player_b?.toLowerCase() === address?.toLowerCase())
+      );
+      const seen = new Set<string>();
+      const merged: Duel[] = [];
+      for (const d of [...open, ...resolved]) {
+        if (!seen.has(d.id)) { seen.add(d.id); merged.push(d); }
+      }
+      merged.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+      setActiveDuels(merged);
+    } catch { /* ignore */ }
+    finally { setLoadingDuels(false); }
+  }, [address]);
+
+  useEffect(() => {
+    refreshDuels();
+    const interval = setInterval(refreshDuels, 15000);
+    return () => clearInterval(interval);
+  }, [refreshDuels]);
 
   const handleCreateDuel = async (promptId: string, entry: string) => {
     if (!address || !profile) return;
@@ -31,21 +57,9 @@ export default function DuelsPage() {
         setError("Duel started but could not fetch ID. Please refresh.");
         return;
       }
-      const fetched = await getDuel(duelId);
+      setTxStatus("Refreshing duel list...");
+      await refreshDuels();
       setTxStatus("");
-      const newDuel: Duel = fetched ?? {
-        id: duelId,
-        prompt_id: promptId,
-        prompt_text: "",
-        player_a: address,
-        entry_a: entry,
-        player_b: null,
-        entry_b: null,
-        status: "waiting",
-        verdict: null,
-        created_at: Date.now() / 1000,
-      };
-      setActiveDuels((d) => [newDuel, ...d]);
     } catch (e: unknown) {
       setError((e as Error).message ?? "Failed to create duel.");
       setTxStatus("");
@@ -60,10 +74,9 @@ export default function DuelsPage() {
     setTxStatus("Joining duel on GenLayer...");
     try {
       await joinDuel(address, duelId, entry);
+      setTxStatus("Refreshing...");
+      await refreshDuels();
       setTxStatus("");
-      setActiveDuels((duels) =>
-        duels.map((d) => d.id === duelId ? { ...d, player_b: address, entry_b: entry, status: "ready" } : d)
-      );
     } catch (e: unknown) {
       setError((e as Error).message ?? "Failed to join duel.");
       setTxStatus("");
@@ -79,10 +92,7 @@ export default function DuelsPage() {
     try {
       await resolveDuel(address, duelId);
       setTxStatus("Reading result...");
-      const updated = await getDuel(duelId);
-      if (updated) {
-        setActiveDuels((duels) => duels.map((d) => d.id === duelId ? updated : d));
-      }
+      await refreshDuels();
       setTxStatus("");
     } catch (e: unknown) {
       setError((e as Error).message ?? "Failed to resolve duel.");
@@ -116,9 +126,15 @@ export default function DuelsPage() {
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs font-black uppercase tracking-widest text-[#6B6257]">Active Duels</p>
-            {activeDuels.length === 0 && (
-              <p className="text-sm text-[#6B6257] font-mono">No active duels. Start one.</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-black uppercase tracking-widest text-[#6B6257]">Open Duels</p>
+              {!loadingDuels && <span className="text-[10px] font-mono text-[#6B6257]">(live · refreshes every 15s)</span>}
+            </div>
+            {loadingDuels && (
+              <p className="text-sm text-[#6B6257] font-mono animate-pulse">Loading duels from chain...</p>
+            )}
+            {!loadingDuels && activeDuels.length === 0 && (
+              <p className="text-sm text-[#6B6257] font-mono">No open duels. Start one.</p>
             )}
             {activeDuels.map((duel) => (
               <DuelCard

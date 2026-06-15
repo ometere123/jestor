@@ -2,7 +2,7 @@
  * Shared helpers for all QA suites.
  */
 
-export const CONTRACT = "0x87B900cAF8f13Ee077D57aCd0C08E9b3F62002d4";
+export const CONTRACT = "0x173803123A5B925eb5Ca5Ed10065607594f4e9f3";
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 

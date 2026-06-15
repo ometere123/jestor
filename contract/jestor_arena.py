@@ -492,6 +492,25 @@ class JestoraArena(gl.Contract):
         return self.latest_duel.get(address.lower(), "")
 
     @gl.public.view
+    def get_open_duels(self) -> list:
+        result = []
+        for duel_id in self.duels:
+            d = self._get_duel(duel_id)
+            if d.get("status") == "waiting":
+                result.append(d)
+        result.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+        return result[:20]
+
+    @gl.public.view
+    def get_all_duels(self) -> list:
+        result = []
+        for duel_id in self.duels:
+            d = self._get_duel(duel_id)
+            result.append(d)
+        result.sort(key=lambda x: x.get("created_at", 0), reverse=True)
+        return result[:50]
+
+    @gl.public.view
     def get_active_prompts(self) -> list:
         result = []
         for pid in self.prompts:

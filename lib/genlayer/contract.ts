@@ -217,6 +217,16 @@ export async function getSubmission(submissionId: string): Promise<Submission | 
   return result as Submission;
 }
 
+export async function getOpenDuels(): Promise<Duel[]> {
+  const result = await callRead("get_open_duels", []);
+  return (result as Duel[]) ?? [];
+}
+
+export async function getAllDuels(): Promise<Duel[]> {
+  const result = await callRead("get_all_duels", []);
+  return (result as Duel[]) ?? [];
+}
+
 export async function getLatestDuelId(address: string): Promise<string | null> {
   const result = await callRead("get_latest_duel_id", [address.toLowerCase()]);
   return (typeof result === "string" && result.length > 0) ? result : null;
