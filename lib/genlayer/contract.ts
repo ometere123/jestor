@@ -1,5 +1,6 @@
 "use client";
 
+import type { CalldataEncodable, Hash } from "genlayer-js/types";
 import { getReadClient, getWriteClient, getContractAddress, USE_MOCK } from "./client";
 import { mockContract } from "../jestora/mockContract";
 import type {
@@ -15,7 +16,7 @@ import type {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-type Arg = unknown;
+type Arg = CalldataEncodable;
 
 export interface WriteResult {
   hash: string;
@@ -145,7 +146,7 @@ async function callWrite(
   // it returns the full GenLayer receipt including consensus_data + eq_outputs.
   // The MetaMask write client returns a standard ETH receipt without those fields.
   const receipt = await readClient.waitForTransactionReceipt({
-    hash: hash as `0x${string}`,
+    hash: hash as Hash,
     retries: 60,
     interval: 5000,
   });
