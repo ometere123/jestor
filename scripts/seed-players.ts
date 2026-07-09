@@ -33,8 +33,9 @@ import { createClient, createAccount, generatePrivateKey } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 import type { Hash } from "genlayer-js/types";
 
-const address = process.env.NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS as `0x${string}` | undefined;
-if (!address) throw new Error("NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS not set in .env.local");
+const rawAddress = process.env.NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS;
+if (!rawAddress) throw new Error("NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS not set in .env.local");
+const address = rawAddress as `0x${string}`;
 
 type Player = {
   name: string;
