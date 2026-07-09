@@ -53,7 +53,7 @@ export default function ChaosActionForm({ onSubmit, isLoading, hasUsedToday }: C
             onClick={() => setText(ex)}
             className="text-left text-xs font-mono text-[#6B6257] hover:text-[#121212] hover:bg-white border border-transparent hover:border-[#FF8BD1] px-2 py-1 transition-all"
           >
-            "{ex}"
+            {ex}
           </button>
         ))}
       </div>

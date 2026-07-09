@@ -25,7 +25,7 @@ export default function ConsensusTrace({ traces }: ConsensusTraceProps) {
   if (!traces.length) {
     return (
       <div className="bg-[#121212] border border-[#00D8C8] p-4 font-mono text-[#00D8C8] text-xs">
-        <p className="opacity-50">// No trace yet. Submit something to generate a consensus trace.</p>
+        <p className="opacity-50">No trace yet. Submit something to generate a consensus trace.</p>
       </div>
     );
   }

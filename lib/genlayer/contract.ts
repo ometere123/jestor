@@ -15,8 +15,7 @@ import type {
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Arg = any;
+type Arg = unknown;
 
 export interface WriteResult {
   hash: string;
@@ -145,9 +144,8 @@ async function callWrite(
   // Use the read client (GenLayer-native account) to wait for the receipt -
   // it returns the full GenLayer receipt including consensus_data + eq_outputs.
   // The MetaMask write client returns a standard ETH receipt without those fields.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const receipt = await readClient.waitForTransactionReceipt({
-    hash: hash as any,
+    hash: hash as `0x${string}`,
     retries: 60,
     interval: 5000,
   });

@@ -12,7 +12,7 @@ export function clientSafetyCheck(text: string): { safe: boolean; reason: string
     if (pattern.test(text)) {
       return {
         safe: false,
-        reason: "Submission contains blocked content. The safety goblin said no.",
+        reason: "Submission contains blocked content and cannot be judged.",
       };
     }
   }

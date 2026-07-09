@@ -4,8 +4,15 @@
 import { createClient, createAccount } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
-const PRIVATE_KEY = "0xd94494a5e2fc489c843fff96e87c7035cf076294806ec8e3415f13eb36d16da9";
-const CONTRACT = "0xe94D91d36A4Db1dEE97b3FE6f23A620824D21cD5";
+const PRIVATE_KEY = process.env.GL_PK1;
+const CONTRACT = process.env.NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS ?? process.env.GL_CONTRACT;
+
+if (!PRIVATE_KEY) {
+  throw new Error("Missing GL_PK1. Example: GL_PK1=0x... GL_CONTRACT=0x... node scripts/debug_tx.mjs");
+}
+if (!CONTRACT) {
+  throw new Error("Missing GL_CONTRACT or NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS.");
+}
 
 async function main() {
   const account = createAccount(PRIVATE_KEY);

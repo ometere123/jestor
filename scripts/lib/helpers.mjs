@@ -2,7 +2,11 @@
  * Shared helpers for all QA suites.
  */
 
-export const CONTRACT = "0x173803123A5B925eb5Ca5Ed10065607594f4e9f3";
+export const CONTRACT = process.env.NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS ?? process.env.GL_CONTRACT;
+
+if (!CONTRACT) {
+  throw new Error("Missing GL_CONTRACT or NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS.");
+}
 
 // ── Formatting ────────────────────────────────────────────────────────────────
 
@@ -104,7 +108,7 @@ export async function callWrite(client, functionName, args, callerLabel) {
       let txData = receipt;
       try {
         txData = await client.getTransaction({ hash });
-      } catch (_) { /* fall back to receipt */ }
+      } catch { /* fall back to receipt */ }
 
       const execResult = parseExecResult(txData) ?? parseExecResult(receipt);
       const ms = Date.now() - t0;

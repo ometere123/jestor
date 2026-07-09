@@ -48,13 +48,13 @@ export default function RoastInputPanel({ onSubmit, isLoading }: RoastInputPanel
             onClick={() => setText(ex)}
             className="block w-full text-left text-xs font-mono text-[#6B6257] hover:text-[#121212] hover:bg-white border border-transparent hover:border-[#C99A6B] px-2 py-1 mb-1 transition-all"
           >
-            "{ex}"
+            {ex}
           </button>
         ))}
       </div>
 
       <Textarea
-        placeholder="Roast yourself. Be playful. The safety goblin is watching."
+        placeholder="Roast yourself. Be playful. The safety checks are strict."
         value={text}
         onChange={(e) => setText(e.target.value)}
         rows={3}

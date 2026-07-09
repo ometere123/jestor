@@ -137,8 +137,12 @@ class JestoraArena(gl.Contract):
         value = data.get(key)
         return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
 
+    def _is_nonempty_str(self, data: dict, key: str, max_len: int = 500) -> bool:
+        value = data.get(key)
+        return isinstance(value, str) and 0 < len(value.strip()) <= max_len
+
     def _validate_caption_verdict(self, data: dict) -> bool:
-        return (
+        if not (
             isinstance(data, dict)
             and data.get("safety_class") in {"SAFE", "UNSAFE", "TARGETED_ABUSE", "HATE", "SEXUAL", "SELF_HARM", "SPAM"}
             and self._is_int_between(data, "prompt_fit", 0, 100)
@@ -147,22 +151,63 @@ class JestoraArena(gl.Contract):
             and data.get("meme_style") in {"ABSURDIST", "DRY", "CHAOTIC", "WHOLESOME", "SATIRE", "META", "LOW_EFFORT"}
             and data.get("outcome") in {"TRY_AGAIN", "SMALL_LAUGH", "CLEAN_HIT", "ABSURD_GENIUS", "TOO_DERIVATIVE", "BLOCKED"}
             and self._is_int_between(data, "balance_delta", 0, 80)
-            and isinstance(data.get("reason"), str)
-        )
+            and self._is_nonempty_str(data, "reason")
+        ):
+            return False
+
+        safety = data.get("safety_class")
+        outcome = data.get("outcome")
+        delta = int(data.get("balance_delta", 0))
+        humor = int(data.get("humor_score", 0))
+        originality = int(data.get("originality_score", 0))
+
+        if safety in {"UNSAFE", "TARGETED_ABUSE", "HATE", "SEXUAL", "SELF_HARM"}:
+            return outcome == "BLOCKED" and delta == 0
+        if safety == "SPAM":
+            return outcome in {"TOO_DERIVATIVE", "BLOCKED"} and delta <= 5
+        if outcome == "BLOCKED":
+            return delta == 0
+        if outcome == "TOO_DERIVATIVE":
+            return delta <= 5
+        if humor < 30:
+            return outcome == "TRY_AGAIN" and 0 <= delta <= 5
+        if humor < 60:
+            return outcome == "SMALL_LAUGH" and 5 <= delta <= 40
+        if humor < 80:
+            return outcome == "CLEAN_HIT" and 40 <= delta <= 65
+        if originality >= 70:
+            return outcome == "ABSURD_GENIUS" and 65 <= delta <= 80
+        return outcome == "CLEAN_HIT" and 40 <= delta <= 65
 
     def _validate_roast_verdict(self, data: dict) -> bool:
-        return (
+        if not (
             isinstance(data, dict)
             and data.get("safety_class") in {"SAFE", "TOO_MEAN", "UNSAFE", "TARGETED_ABUSE", "HATE", "SELF_HARM"}
             and self._is_int_between(data, "playfulness_score", 0, 100)
             and self._is_int_between(data, "humor_score", 0, 100)
             and data.get("outcome") in {"HUMBLE_PIE", "BRUTAL_BUT_SAFE", "TRY_AGAIN", "BLOCKED"}
             and self._is_int_between(data, "balance_delta", 0, 40)
-            and isinstance(data.get("reason"), str)
-        )
+            and self._is_nonempty_str(data, "reason")
+        ):
+            return False
+
+        safety = data.get("safety_class")
+        outcome = data.get("outcome")
+        delta = int(data.get("balance_delta", 0))
+        playfulness = int(data.get("playfulness_score", 0))
+
+        if safety != "SAFE":
+            return outcome == "BLOCKED" and delta == 0
+        if outcome == "BLOCKED":
+            return delta == 0
+        if playfulness < 30:
+            return outcome == "TRY_AGAIN" and 0 <= delta <= 5
+        if playfulness < 70:
+            return outcome == "HUMBLE_PIE" and 5 <= delta <= 20
+        return outcome == "BRUTAL_BUT_SAFE" and 20 <= delta <= 40
 
     def _validate_duel_verdict(self, data: dict) -> bool:
-        return (
+        if not (
             isinstance(data, dict)
             and data.get("winner") in {"A", "B", "DRAW", "NO_CONTEST"}
             and self._is_int_between(data, "entry_a_score", 0, 100)
@@ -170,19 +215,54 @@ class JestoraArena(gl.Contract):
             and self._is_int_between(data, "a_delta", 0, 60)
             and self._is_int_between(data, "b_delta", 0, 60)
             and data.get("safety_class") in {"SAFE", "UNSAFE"}
-            and isinstance(data.get("reason"), str)
-        )
+            and self._is_nonempty_str(data, "reason")
+        ):
+            return False
+
+        winner = data.get("winner")
+        safety = data.get("safety_class")
+        a_score = int(data.get("entry_a_score", 0))
+        b_score = int(data.get("entry_b_score", 0))
+        a_delta = int(data.get("a_delta", 0))
+        b_delta = int(data.get("b_delta", 0))
+
+        if safety == "UNSAFE":
+            return winner == "NO_CONTEST" and a_delta == 0 and b_delta == 0
+        if winner == "NO_CONTEST":
+            return safety == "UNSAFE" and a_delta == 0 and b_delta == 0
+        if winner == "A":
+            return a_score > b_score and a_delta > b_delta and 10 <= a_delta <= 60 and 0 <= b_delta <= 10
+        if winner == "B":
+            return b_score > a_score and b_delta > a_delta and 10 <= b_delta <= 60 and 0 <= a_delta <= 10
+        return abs(a_score - b_score) <= 10 and 0 <= a_delta <= 10 and 0 <= b_delta <= 10
 
     def _validate_chaos_verdict(self, data: dict) -> bool:
-        return (
+        if not (
             isinstance(data, dict)
             and isinstance(data.get("valid"), bool)
             and data.get("chaos_class") in {"BLESSING", "CURSE", "MIRROR", "CONFETTI", "NULL_EVENT"}
             and self._is_int_between(data, "balance_delta", -25, 75)
-            and isinstance(data.get("title"), str)
-            and isinstance(data.get("flavor_text"), str)
-            and isinstance(data.get("reason"), str)
-        )
+            and self._is_nonempty_str(data, "title", 80)
+            and self._is_nonempty_str(data, "flavor_text", 240)
+            and self._is_nonempty_str(data, "reason")
+        ):
+            return False
+
+        valid = bool(data.get("valid"))
+        chaos_class = data.get("chaos_class")
+        delta = int(data.get("balance_delta", 0))
+
+        if not valid:
+            return chaos_class == "NULL_EVENT" and delta == 0
+        if chaos_class == "BLESSING":
+            return 20 <= delta <= 75
+        if chaos_class == "CURSE":
+            return -25 <= delta <= 0
+        if chaos_class == "MIRROR":
+            return -5 <= delta <= 20
+        if chaos_class == "CONFETTI":
+            return 10 <= delta <= 50
+        return delta == 0
 
     def _validate_llm_verdict(self, kind: str, data: dict) -> bool:
         if kind == "caption":
@@ -579,6 +659,7 @@ Rules:
 - humor_score 30-59: SMALL_LAUGH, delta 5-40
 - humor_score 60-79: CLEAN_HIT, delta 40-65
 - humor_score >= 80 and originality_score >= 70: ABSURD_GENIUS, delta 65-80
+- humor_score >= 80 and originality_score < 70: CLEAN_HIT, delta 40-65
 - If clearly copied or spammy: TOO_DERIVATIVE, delta 0-5
 """
         v = self._run_llm_json("caption", prompt)
@@ -694,7 +775,9 @@ Return ONLY a JSON object with these exact fields:
 
 Rules:
 - If either entry is unsafe: NO_CONTEST and safety_class UNSAFE.
-- Winner gets higher delta. Loser gets a small participation delta.
+- If safety_class is UNSAFE: winner NO_CONTEST and both deltas 0.
+- Winner gets higher score and higher delta. Loser gets a small participation delta from 0-10.
+- A DRAW requires close scores and both deltas from 0-10.
 - Judge on: prompt fit, humour, originality, concision, safety.
 """
         v = self._run_llm_json("duel", prompt)
@@ -778,6 +861,7 @@ Return ONLY a JSON object with these exact fields:
 
 Rules:
 - valid is false ONLY if the action contains real-world threats, explicit harm, or financial claims.
+- If valid is false: chaos_class NULL_EVENT and balance_delta 0.
 - Playful, weird, and absurdist actions are always valid.
 - BLESSING: fun positive event, delta 20-75
 - CURSE: small negative or zero event, delta -25 to 0

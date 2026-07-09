@@ -47,7 +47,7 @@ export default function CaptionRiftPage() {
       logAction("SUBMIT_CAPTION", `Round: ${selectedPrompt.id}, submitting`);
       logAction("SAFETY", "Client pre-flight safety check passed");
       logAction("GENLAYER", "_judge_caption invoked on JestoraArena");
-      logAction("VALIDATORS", "Humour equivalence check, awaiting consensus");
+      logAction("VALIDATORS", "Humour score and reward rule checks, awaiting consensus");
       setTraces(getTraces());
       setValidatorState("running");
       setTxStatus("Sending to GenLayer...");
@@ -148,7 +148,6 @@ export default function CaptionRiftPage() {
               <CaptionSubmitForm
                 promptId={selectedPrompt?.id ?? null}
                 promptText={selectedPrompt?.text ?? ""}
-                senderAddress={address ?? ""}
                 onSubmit={handleSubmit}
                 isLoading={isLoading}
               />

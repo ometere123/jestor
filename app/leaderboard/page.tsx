@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import ArenaShell from "@/components/layout/ArenaShell";
 import Badge from "@/components/ui/Badge";
-import Sticker from "@/components/ui/Sticker";
 import { getTierLabel, getTierColor } from "@/lib/jestora/balanceRules";
 import { shortAddress } from "@/lib/jestora/format";
 import { getLeaderboard, getProtocolStats } from "@/lib/genlayer/contract";

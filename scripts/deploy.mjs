@@ -7,7 +7,11 @@ import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
-const PRIVATE_KEY = "0xd94494a5e2fc489c843fff96e87c7035cf076294806ec8e3415f13eb36d16da9";
+const PRIVATE_KEY = process.env.GL_DEPLOY_PK ?? process.env.GL_PK1;
+if (!PRIVATE_KEY) {
+  throw new Error("Missing GL_DEPLOY_PK or GL_PK1. Example: GL_DEPLOY_PK=0x... node scripts/deploy.mjs");
+}
+
 const __dir = dirname(fileURLToPath(import.meta.url));
 const contractCode = readFileSync(join(__dir, "../contract/jestor_arena.py"), "utf8");
 

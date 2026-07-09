@@ -7,6 +7,10 @@ import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 import { Zap } from "lucide-react";
 
+type EthereumProvider = {
+  request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
+};
+
 export default function ArenaTopbar() {
   const { address, isConnected, isConnecting, connect, disconnect, chainId } = useWallet();
   const targetChain = parseInt(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID ?? "61999");
@@ -14,16 +18,17 @@ export default function ArenaTopbar() {
 
   const switchToStudionet = async () => {
     if (!window.ethereum) return;
+    const provider = window.ethereum as EthereumProvider;
     const chainHex = `0x${targetChain.toString(16)}`;
     try {
-      await (window.ethereum as any).request({
+      await provider.request({
         method: "wallet_switchEthereumChain",
         params: [{ chainId: chainHex }],
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Chain not added yet, add it
-      if (err.code === 4902) {
-        await (window.ethereum as any).request({
+      if (typeof err === "object" && err !== null && "code" in err && err.code === 4902) {
+        await provider.request({
           method: "wallet_addEthereumChain",
           params: [{
             chainId: chainHex,

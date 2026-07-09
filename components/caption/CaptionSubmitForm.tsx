@@ -9,7 +9,6 @@ import { logAction } from "@/lib/jestora/localCache";
 interface CaptionSubmitFormProps {
   promptId: string | null;
   promptText: string;
-  senderAddress: string;
   onSubmit: (caption: string) => Promise<void>;
   isLoading: boolean;
 }
@@ -17,7 +16,6 @@ interface CaptionSubmitFormProps {
 export default function CaptionSubmitForm({
   promptId,
   promptText,
-  senderAddress,
   onSubmit,
   isLoading,
 }: CaptionSubmitFormProps) {

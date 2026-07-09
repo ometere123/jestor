@@ -25,7 +25,7 @@ const fakePrompts: Prompt[] = [
 const fakeLeaderboard: LeaderboardEntry[] = [
   { address: "0xABCD...1234", alias: "NoodleChaos", balance: 842, duel_wins: 7 },
   { address: "0xDEAD...BEEF", alias: "VaporZine", balance: 631, duel_wins: 4 },
-  { address: "0xFACE...CAFE", alias: "MemeGoblin", balance: 517, duel_wins: 3 },
+  { address: "0xFACE...CAFE", alias: "MemePilot", balance: 517, duel_wins: 3 },
   { address: "0x1337...C0DE", alias: "GlitchProphet", balance: 403, duel_wins: 2 },
   { address: "0xBEEF...DEAD", alias: "ChaosEditor", balance: 289, duel_wins: 1 },
 ];
@@ -33,7 +33,7 @@ const fakeLeaderboard: LeaderboardEntry[] = [
 const fakeChaosEvents: ChaosEvent[] = [
   { type: "chaos", alias: "NoodleChaos", chaos_class: "BLESSING", title: "Validator Chose Violence", flavor_text: "The oracle sneezed confetti.", delta: 55, reason: "Pure absurdist energy", timestamp: Date.now() / 1000 - 300 },
   { type: "caption", alias: "VaporZine", outcome: "ABSURD_GENIUS", delta: 80, reason: "Prompt fit was chef's kiss", timestamp: Date.now() / 1000 - 900 },
-  { type: "duel", alias_a: "MemeGoblin", alias_b: "GlitchProphet", winner: "A", reason: "Entry A had more chaos energy", timestamp: Date.now() / 1000 - 1800 },
+  { type: "duel", alias_a: "MemePilot", alias_b: "GlitchProphet", winner: "A", reason: "Entry A had more chaos energy", timestamp: Date.now() / 1000 - 1800 },
   { type: "roast", alias: "ChaosEditor", outcome: "BRUTAL_BUT_SAFE", delta: 35, reason: "Genuinely funny self-roast", timestamp: Date.now() / 1000 - 2700 },
 ];
 

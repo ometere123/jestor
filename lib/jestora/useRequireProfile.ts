@@ -16,28 +16,33 @@ export function useRequireProfile() {
   useEffect(() => {
     let cancelled = false;
 
-    if (!isConnected || !address) {
-      setProfile(null);
-      setIsCheckingProfile(false);
-      return;
-    }
+    async function checkProfile() {
+      await Promise.resolve();
+      if (cancelled) return;
 
-    setIsCheckingProfile(true);
+      if (!isConnected || !address) {
+        setProfile(null);
+        setIsCheckingProfile(false);
+        return;
+      }
 
-    getProfile(address)
-      .then((nextProfile) => {
+      setIsCheckingProfile(true);
+
+      try {
+        const nextProfile = await getProfile(address);
         if (cancelled) return;
         setProfile(nextProfile);
         if (!nextProfile && pathname !== "/arena") {
           router.replace("/arena");
         }
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) {
           setIsCheckingProfile(false);
         }
-      });
+      }
+    }
 
+    void checkProfile();
     return () => {
       cancelled = true;
     };

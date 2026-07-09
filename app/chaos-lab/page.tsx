@@ -30,9 +30,12 @@ export default function ChaosLabPage() {
 
   useEffect(() => {
     if (!address) return;
-    const today = new Date().toDateString();
-    const lastUsed = localStorage.getItem(LAST_CHAOS_KEY + address);
-    setHasUsedToday(lastUsed === today);
+    const timer = window.setTimeout(() => {
+      const today = new Date().toDateString();
+      const lastUsed = localStorage.getItem(LAST_CHAOS_KEY + address);
+      setHasUsedToday(lastUsed === today);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [address]);
 
   const handleSubmit = async (text: string) => {
@@ -47,7 +50,7 @@ export default function ChaosLabPage() {
       logAction("INVOKE_CHAOS", "Chaos action submitted to JestoraArena");
       logAction("SAFETY", "Financial and harm checks passed");
       logAction("GENLAYER", "_judge_chaos invoked");
-      logAction("VALIDATORS", "Chaos class equivalence check, awaiting consensus");
+      logAction("VALIDATORS", "Chaos class and delta rule checks, awaiting consensus");
       setTraces(getTraces());
       setTxStatus("Sending to GenLayer...");
 

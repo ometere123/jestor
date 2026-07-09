@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils/cn";
-
 interface ScorePillProps {
   label: string;
   value: number;

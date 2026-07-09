@@ -26,23 +26,40 @@ export default function ArenaPage() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [stats, setStats] = useState<ProtocolStats | null>(null);
   const [lastVerdict, setLastVerdict] = useState<AnyVerdict | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!address) return;
-    setLoading(true);
-    Promise.all([
-      getProfile(address),
-      getChaosFeed(15),
-      getActivePrompts(),
-      getProtocolStats(),
-    ]).then(([p, cf, ap, s]) => {
+    let cancelled = false;
+
+    async function loadArena() {
+      await Promise.resolve();
+      if (cancelled) return;
+
+      if (!address) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      const [p, cf, ap, s] = await Promise.all([
+        getProfile(address),
+        getChaosFeed(15),
+        getActivePrompts(),
+        getProtocolStats(),
+      ]);
+      if (cancelled) return;
       setProfile(p);
       setChaosEvents(cf);
       setPrompts(ap);
       setStats(s);
       setLastVerdict(getLastVerdict() as AnyVerdict | null);
-    }).finally(() => setLoading(false));
+      setLoading(false);
+    }
+
+    void loadArena();
+    return () => {
+      cancelled = true;
+    };
   }, [address]);
 
   const handleCreateProfile = async () => {

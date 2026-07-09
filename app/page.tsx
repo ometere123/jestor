@@ -10,7 +10,7 @@ const DEMO_CONSOLE = [
   { step: "SUBMIT_CAPTION", msg: "Received", color: "#FFE600" },
   { step: "SAFETY", msg: "No unsafe class detected", color: "#35E36D" },
   { step: "GENLAYER", msg: "_review_caption invoked", color: "#0057FF" },
-  { step: "VALIDATORS", msg: "Humour equivalence check running", color: "#00D8C8" },
+  { step: "VALIDATORS", msg: "Humour and rule checks running", color: "#00D8C8" },
   { step: "CONSENSUS", msg: "outcome: ABSURD_GENIUS", color: "#7A35FF" },
   { step: "CAP", msg: "requested delta +92 capped to +80", color: "#FF3B30" },
   { step: "BALANCE", msg: "+80 Jest Points applied", color: "#35E36D" },
@@ -98,12 +98,12 @@ export default function LandingPage() {
         {/* Modes grid */}
         <section>
           <h2 className="font-['Rubik_Mono_One',monospace] text-2xl text-[#121212] mb-6">
-            // Arena Modes
+            Arena Modes
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
               { href: "/caption-rift", title: "Caption Rift", desc: "Submit captions to prompts. GenLayer judges humour, fit, and originality.", color: "#35E36D", sticker: "ABSURDIST" },
-              { href: "/roast", title: "Roast Balance", desc: "Roast yourself. The contract decides if it's playful enough to reward.", color: "#FF3B30", sticker: "SELF-ROAST" },
+              { href: "/roast", title: "Roast Balance", desc: "Roast yourself. The contract decides if it is playful enough to reward.", color: "#FF3B30", sticker: "SELF-ROAST" },
               { href: "/duels", title: "Meme Duels", desc: "Two players, one prompt, GenLayer picks the winner.", color: "#7A35FF", sticker: "1v1" },
               { href: "/chaos-lab", title: "Chaos Lab", desc: "One daily chaos action. The oracle decides blessing or curse.", color: "#FF8BD1", sticker: "DAILY" },
             ].map(({ href, title, desc, color, sticker }) => (
@@ -131,12 +131,12 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-[#6B6257]">
             <div>
-              <p className="font-black text-[#121212] mb-1">Normal contracts can't judge humour.</p>
-              <p>Deterministic code can't decide if a meme is funny. GenLayer uses AI-validator consensus to make subjective judgements transparently.</p>
+              <p className="font-black text-[#121212] mb-1">Normal contracts cannot judge humour.</p>
+              <p>Deterministic code cannot decide if a meme is funny. GenLayer uses AI-validator consensus to make subjective judgements transparently.</p>
             </div>
             <div>
-              <p className="font-black text-[#121212] mb-1">Validators agree on structured verdicts.</p>
-              <p>Jestor uses fixed JSON schemas so validators reach consensus reliably, then the contract applies deterministic caps.</p>
+              <p className="font-black text-[#121212] mb-1">Validators check structured outcomes.</p>
+              <p>Jestor uses fixed schemas plus deterministic rule checks before capped balance changes are applied.</p>
             </div>
             <div>
               <p className="font-black text-[#121212] mb-1">Every balance change is traceable.</p>

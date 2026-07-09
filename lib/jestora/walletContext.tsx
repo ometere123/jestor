@@ -23,8 +23,6 @@ const WalletContext = createContext<WalletState>({
   disconnect: () => {},
 });
 
-const TARGET_CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID ?? "61999");
-
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [chainId, setChainId] = useState<number | null>(null);

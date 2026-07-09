@@ -35,7 +35,7 @@ export default function RoastPage() {
       setTraces(getTraces());
       setTxStatus("Sending to GenLayer...");
 
-      const { hash: _hash, verdict: receiptVerdict } = await submitRoastSelf(address, text);
+      const { verdict: receiptVerdict } = await submitRoastSelf(address, text);
       setTxStatus("Consensus reached. Reading verdict...");
 
       const updatedProfile = await getProfile(address);

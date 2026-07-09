@@ -6,7 +6,7 @@ import DuelCreateForm from "@/components/duels/DuelCreateForm";
 import DuelCard from "@/components/duels/DuelCard";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { startDuel, joinDuel, resolveDuel, getDuel, getLatestDuelId, getOpenDuels, getAllDuels } from "@/lib/genlayer/contract";
+import { startDuel, joinDuel, resolveDuel, getLatestDuelId, getOpenDuels, getAllDuels } from "@/lib/genlayer/contract";
 import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
 import type { Duel } from "@/lib/genlayer/types";
 
@@ -39,9 +39,14 @@ export default function DuelsPage() {
   }, [address]);
 
   useEffect(() => {
-    refreshDuels();
+    const initialRefresh = window.setTimeout(() => {
+      void refreshDuels();
+    }, 0);
     const interval = setInterval(refreshDuels, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      window.clearTimeout(initialRefresh);
+      clearInterval(interval);
+    };
   }, [refreshDuels]);
 
   const handleCreateDuel = async (promptId: string, entry: string) => {

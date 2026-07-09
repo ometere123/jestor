@@ -3,9 +3,6 @@
 import { motion, useAnimation } from "framer-motion";
 import { useEffect } from "react";
 
-const SEGMENTS = ["BLESSING", "CURSE", "MIRROR", "CONFETTI", "NULL", "CHAOS", "BLESSING", "CURSE"];
-const COLORS = ["#35E36D", "#FF3B30", "#00D8C8", "#FF8BD1", "#D8D0BF", "#FFE600", "#35E36D", "#FF3B30"];
-
 interface ChaosWheelProps {
   spinning: boolean;
 }

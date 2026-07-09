@@ -5,9 +5,16 @@
 import { createClient, createAccount } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
-const PRIVATE_KEY = "0xd94494a5e2fc489c843fff96e87c7035cf076294806ec8e3415f13eb36d16da9";
-const CONTRACT = "0x7A2bD6c486Bca40e288241AaD60dFf7223e3af82";
+const PRIVATE_KEY = process.env.GL_PK1;
+const CONTRACT = process.env.NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS ?? process.env.GL_CONTRACT;
 const ALIAS = "QATester_" + Date.now().toString(36).slice(-4);
+
+if (!PRIVATE_KEY) {
+  throw new Error("Missing GL_PK1. Example: GL_PK1=0x... GL_CONTRACT=0x... node scripts/qa.mjs");
+}
+if (!CONTRACT) {
+  throw new Error("Missing GL_CONTRACT or NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS.");
+}
 
 const PASS = "✅ PASS";
 const FAIL = "❌ FAIL";
@@ -67,7 +74,6 @@ async function write(client, method, args, label) {
       console.log(`${INFO} leader exec_result: ${lr.execution_result}`);
     }
 
-    const succeeded = execName === "FINISHED_WITH_RETURN" || statusName === "FINALIZED" || statusName === "ACCEPTED";
     assert(execName !== "FINISHED_WITH_ERROR", `execution succeeded (exec=${execName})`);
     return { hash, receipt, succeeded: execName !== "FINISHED_WITH_ERROR" };
   } catch (e) {
@@ -109,7 +115,7 @@ async function main() {
   // ── 1. create_profile (skip if already exists) ──────────────────────────
   if (!profileExists) {
     console.log("\n[TEST 1] create_profile");
-    const r = await write(client, "create_profile", [ALIAS], "create_profile");
+    await write(client, "create_profile", [ALIAS], "create_profile");
     console.log("\n[TEST 1 READ] get_profile after create");
     const p = await read(client, "get_profile", [addr], "profile");
     assert(p && Object.keys(p).length > 0, "profile created");

@@ -7,7 +7,7 @@
 ## Live Demo
 
 **App:** https://jestor.vercel.app  
-**Contract:** `0x87B900cAF8f13Ee077D57aCd0C08E9b3F62002d4`  
+**Contract:** `0x148aEB21f9ED1aD76b38EDCC8d8c845b3E1F220A`  
 **Network:** GenLayer Studionet (chainId 61999)  
 **RPC:** `https://studio.genlayer.com/api`
 
@@ -60,7 +60,7 @@ Two players submit entries to the same prompt. AI validators pick the winner:
 
 ## Equivalence Principle
 
-All four judge functions use **schema validation** as the equivalence principle — not `strict_eq`. The validator function checks that the leader's output conforms to an expected JSON schema (enum membership, numeric ranges, required string fields). This ensures consensus is reached on the *structure* of the verdict, not the exact wording, which is appropriate for free-text LLM outputs.
+All four judge functions use **rule-checked structured verdicts** as the equivalence principle — not `strict_eq`. The validator function checks that the leader's output conforms to the expected JSON schema **and** obeys deterministic game rules: safety outcomes must block rewards, score bands must match reward bands, duel winners must have higher scores and deltas, loser rewards stay capped, and chaos classes must match their allowed delta ranges. This ensures consensus is reached on a valid outcome, not just on output formatting.
 
 ```python
 def validator_fn(leader_result: str) -> bool:
@@ -69,8 +69,10 @@ def validator_fn(leader_result: str) -> bool:
         isinstance(data, dict)
         and data.get("outcome") in VALID_OUTCOMES
         and 0 <= data.get("balance_delta", -1) <= 80
+        and outcome_matches_score_band(data)
+        and safety_rules_are_enforced(data)
         and isinstance(data.get("reason"), str)
-        # ... full schema check
+        # ... full schema + rule checks
     )
 ```
 
@@ -115,7 +117,7 @@ Jest Points are **internal toy balances** — gameplay scores only.
 ```bash
 npm install
 # Create .env.local:
-# NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS=0x87B900cAF8f13Ee077D57aCd0C08E9b3F62002d4
+# NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS=0x148aEB21f9ED1aD76b38EDCC8d8c845b3E1F220A
 # NEXT_PUBLIC_GENLAYER_CHAIN_ID=61999
 # NEXT_PUBLIC_GENLAYER_RPC_URL=https://studio.genlayer.com/api
 # NEXT_PUBLIC_USE_MOCK_CONTRACT=false
@@ -123,6 +125,8 @@ npm run dev
 ```
 
 Connect MetaMask to GenLayer Studionet (chainId 61999). The app has a one-click network switch button if you're on the wrong chain.
+
+After changing `contract/jestor_arena.py`, redeploy the contract and update `NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS` with the new address before testing the live app.
 
 ---
 
@@ -136,7 +140,7 @@ Four suites:
 - **s0** — Sanity: RPC reachable, both wallets funded
 - **s1** — Deterministic happy path: profiles, prompts, duels, leaderboard
 - **s2** — 21 revert paths: validation errors, cooldowns, duplicates
-- **s3** — Non-deterministic: all 4 AI-judged functions with schema validation
+- **s3** — Non-deterministic: all 4 AI-judged functions with schema and rule validation
 
 ---
 
@@ -145,7 +149,7 @@ Four suites:
 | Layer | Tech |
 |---|---|
 | Intelligent Contract | Python, `genlayer`, `gl.vm.run_nondet_unsafe` |
-| Frontend | Next.js 15, TypeScript, Tailwind CSS |
+| Frontend | Next.js 16.2.9, TypeScript, Tailwind CSS |
 | Wallet | MetaMask (injected), GenLayer JS SDK |
 | Chain | GenLayer Studionet (chainId 61999) |
 | No external AI | All LLM judgement via GenLayer validator consensus |
