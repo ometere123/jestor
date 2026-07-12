@@ -5,16 +5,28 @@ import { shortAddress } from "@/lib/jestora/format";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { Zap, Menu, X } from "lucide-react";
+import { useState } from "react";
 
 type EthereumProvider = {
   request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
+const NAV_LINKS: [string, string][] = [
+  ["/arena", "Dashboard"],
+  ["/caption-rift", "Caption Rift"],
+  ["/roast", "Roast"],
+  ["/duels", "Duels"],
+  ["/chaos-lab", "Chaos Lab"],
+  ["/leaderboard", "Scores"],
+  ["/rules", "Rules"],
+];
+
 export default function ArenaTopbar() {
   const { address, isConnected, isConnecting, connect, disconnect, chainId } = useWallet();
   const targetChain = parseInt(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID ?? "61999");
   const onCorrectChain = chainId === targetChain;
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const switchToStudionet = async () => {
     if (!window.ethereum) return;
@@ -56,14 +68,7 @@ export default function ArenaTopbar() {
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-1 text-xs font-black uppercase tracking-wider">
-          {[
-            ["/arena", "Dashboard"],
-            ["/caption-rift", "Caption Rift"],
-            ["/roast", "Roast"],
-            ["/duels", "Duels"],
-            ["/chaos-lab", "Chaos Lab"],
-            ["/leaderboard", "Scores"],
-          ].map(([href, label]) => (
+          {NAV_LINKS.map(([href, label]) => (
             <Link
               key={href}
               href={href}
@@ -73,6 +78,16 @@ export default function ArenaTopbar() {
             </Link>
           ))}
         </nav>
+
+        {/* Mobile nav toggle */}
+        <button
+          type="button"
+          aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+          onClick={() => setMobileNavOpen((open) => !open)}
+          className="md:hidden shrink-0 border-2 border-[#121212] bg-[#FFE600] p-1.5 shadow-[2px_2px_0px_#121212] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+        >
+          {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
 
         {/* Wallet */}
         <div className="flex items-center gap-2 shrink-0">
@@ -107,6 +122,22 @@ export default function ArenaTopbar() {
           )}
         </div>
       </div>
+
+      {/* Mobile nav panel */}
+      {mobileNavOpen && (
+        <nav className="md:hidden flex flex-col border-t-2 border-[#121212] bg-[#FFE600] text-xs font-black uppercase tracking-wider">
+          {NAV_LINKS.map(([href, label]) => (
+            <Link
+              key={href}
+              href={href}
+              onClick={() => setMobileNavOpen(false)}
+              className="px-4 py-3 border-b border-[#121212]/20 hover:bg-[#121212] hover:text-[#FFE600] transition-colors"
+            >
+              {label}
+            </Link>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }
