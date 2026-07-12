@@ -9,6 +9,7 @@ body {
   background-color: #FFF8E7;
   color: #121212;
   font-family: "DM Sans", sans-serif;
+  overflow-x: hidden;
 }
 
 /* Scrollbar - zine style */

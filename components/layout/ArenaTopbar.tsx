@@ -55,10 +55,10 @@ export default function ArenaTopbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b-4 border-[#121212] bg-[#FFE600] shadow-[0_4px_0px_#121212]">
-      <div className="mx-auto max-w-7xl flex items-center justify-between px-4 py-2 gap-4">
+      <div className="mx-auto max-w-7xl flex items-center justify-between px-3 sm:px-4 py-2 gap-2 sm:gap-4 overflow-hidden">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0">
-          <span className="font-['Rubik_Mono_One',monospace] text-xl text-[#121212] tracking-tight">
+        <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
+          <span className="font-['Rubik_Mono_One',monospace] text-lg sm:text-xl text-[#121212] tracking-tight truncate">
             JESTOR
           </span>
           <span className="hidden sm:inline text-xs font-black uppercase bg-[#121212] text-[#FFE600] px-1.5 py-0.5 tracking-widest">
@@ -90,28 +90,35 @@ export default function ArenaTopbar() {
         </button>
 
         {/* Wallet */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 min-w-0">
           {isConnected && (
             <>
               {!onCorrectChain && (
                 <button
                   onClick={switchToStudionet}
-                  className="text-xs font-black uppercase bg-[#FF3B30] text-white border-2 border-[#121212] px-2 py-0.5 shadow-[2px_2px_0px_#121212] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
+                  className="text-[10px] sm:text-xs font-black uppercase bg-[#FF3B30] text-white border-2 border-[#121212] px-1.5 sm:px-2 py-0.5 shadow-[2px_2px_0px_#121212] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer whitespace-nowrap"
                 >
-                  Wrong Chain - Switch
+                  <span className="hidden sm:inline">Wrong Chain - Switch</span>
+                  <span className="sm:hidden">Switch</span>
                 </button>
               )}
               {onCorrectChain && (
-                <Badge variant="safe">
+                <Badge variant="safe" className="hidden sm:inline-block">
                   <Zap className="inline w-3 h-3 mr-1" />
                   GL Ready
                 </Badge>
               )}
-              <span className="text-xs font-mono bg-[#121212] text-[#FFE600] px-2 py-1 border border-[#121212]">
+              <span className="text-[10px] sm:text-xs font-mono bg-[#121212] text-[#FFE600] px-1.5 sm:px-2 py-1 border border-[#121212] whitespace-nowrap">
                 {shortAddress(address!)}
               </span>
-              <Button variant="ghost" size="sm" onClick={disconnect}>
-                Disconnect
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={disconnect}
+                className="!px-1.5 sm:!px-3 !text-[10px] sm:!text-xs"
+              >
+                <span className="hidden sm:inline">Disconnect</span>
+                <span className="sm:hidden">Exit</span>
               </Button>
             </>
           )}
