@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { shortAddress } from "./format";
+import { getBurnerAddress, getBurnerPrivateKey, getOrCreateBurnerPrivateKey } from "@/lib/genlayer/client";
 
 interface WalletState {
   address: string | null;
@@ -9,6 +10,7 @@ interface WalletState {
   isConnecting: boolean;
   chainId: number | null;
   error: string | null;
+  isBurner: boolean;
   connect: () => Promise<void>;
   disconnect: () => void;
 }
@@ -19,6 +21,7 @@ const WalletContext = createContext<WalletState>({
   isConnecting: false,
   chainId: null,
   error: null,
+  isBurner: false,
   connect: async () => {},
   disconnect: () => {},
 });
@@ -28,12 +31,29 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [chainId, setChainId] = useState<number | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isBurner, setIsBurner] = useState(false);
 
   const connect = useCallback(async () => {
-    if (typeof window === "undefined" || !window.ethereum) {
-      setError("No injected wallet found. Install MetaMask.");
+    if (typeof window === "undefined") return;
+
+    if (!window.ethereum) {
+      // No injected wallet on this device/browser - fall back to a local
+      // burner signer so the user can still play without installing anything.
+      setIsConnecting(true);
+      setError(null);
+      try {
+        getOrCreateBurnerPrivateKey();
+        setAddress(getBurnerAddress());
+        setChainId(null);
+        setIsBurner(true);
+      } catch (e: unknown) {
+        setError((e as Error).message ?? "Could not create a local signer.");
+      } finally {
+        setIsConnecting(false);
+      }
       return;
     }
+
     setIsConnecting(true);
     setError(null);
     try {
@@ -41,6 +61,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const chainHex = await window.ethereum.request({ method: "eth_chainId" });
       setAddress((accounts as string[])[0]);
       setChainId(parseInt(chainHex as string, 16));
+      setIsBurner(false);
     } catch (e: unknown) {
       setError((e as Error).message ?? "Connection rejected.");
     } finally {
@@ -52,11 +73,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setAddress(null);
     setChainId(null);
     setError(null);
+    setIsBurner(false);
   }, []);
 
   // Restore session on mount without prompting, MetaMask already has permission
   useEffect(() => {
-    if (typeof window === "undefined" || !window.ethereum) return;
+    if (typeof window === "undefined") return;
+
+    if (!window.ethereum) {
+      const existingKey = getBurnerPrivateKey();
+      if (existingKey) {
+        setAddress(getBurnerAddress());
+        setIsBurner(true);
+      }
+      return;
+    }
+
     (window.ethereum.request({ method: "eth_accounts" }) as Promise<string[]>)
       .then((accounts) => {
         if (accounts[0]) {
@@ -94,6 +126,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         isConnecting,
         chainId,
         error,
+        isBurner,
         connect,
         disconnect,
       }}

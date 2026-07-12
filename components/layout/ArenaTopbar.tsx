@@ -23,9 +23,10 @@ const NAV_LINKS: [string, string][] = [
 ];
 
 export default function ArenaTopbar() {
-  const { address, isConnected, isConnecting, connect, disconnect, chainId } = useWallet();
+  const { address, isConnected, isConnecting, connect, disconnect, chainId, isBurner } = useWallet();
   const targetChain = parseInt(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID ?? "61999");
-  const onCorrectChain = chainId === targetChain;
+  // Burner signers talk to GenLayer directly - there's no injected chain to be "wrong".
+  const onCorrectChain = isBurner || chainId === targetChain;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const switchToStudionet = async () => {
@@ -102,11 +103,18 @@ export default function ArenaTopbar() {
                   <span className="sm:hidden">Switch</span>
                 </button>
               )}
-              {onCorrectChain && (
+              {onCorrectChain && !isBurner && (
                 <Badge variant="safe" className="hidden sm:inline-block">
                   <Zap className="inline w-3 h-3 mr-1" />
                   GL Ready
                 </Badge>
+              )}
+              {isBurner && (
+                <span title="Signed locally in this browser, no wallet app needed.">
+                  <Badge variant="yellow" className="hidden sm:inline-block">
+                    Local Signer
+                  </Badge>
+                </span>
               )}
               <span className="text-[10px] sm:text-xs font-mono bg-[#121212] text-[#FFE600] px-1.5 sm:px-2 py-1 border border-[#121212] whitespace-nowrap">
                 {shortAddress(address!)}
