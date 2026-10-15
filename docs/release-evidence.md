@@ -288,3 +288,12 @@ state readbacks, source hashes, and the production deployment are recorded in
 the [corrected deployment manifest](deployment-manifest.md). That manifest is
 the current release record; the older tables above are retained only for
 historical audit traceability and do not describe the production contract.
+
+The final frontend redeploy is `dpl_ESybnXTRQf5iv3TFqNohbofT5tHv` (`READY`),
+inspectable at
+`https://vercel.com/delealufejoel-4184s-projects/jestor/ESybnXTRQf5iv3TFqNohbofT5tHv`.
+The production alias is [jestor.vercel.app](https://jestor.vercel.app). The
+production dependency audit passed with `npm audit --omit=dev` reporting zero
+vulnerabilities. The live browser transaction spec is intentionally skipped on
+hosts without an injected EIP-1193 provider; this host had none, so no browser
+transaction is claimed as executed evidence.

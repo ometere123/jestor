@@ -22,6 +22,7 @@ mock adapter, or a UI animation as proof.
 | Canonical Git source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` |
 | Canonical Git blob | `6bbe25764c37b28b0f5b70a6e5ee13cd32f8f6c7` |
 | Code commit containing deployed contract | `489cba3` |
+| Release commit containing deployed frontend | `b0503f0` |
 
 The retrieved source was compared byte-for-byte with the release working
 source before release. The previous deployment
@@ -112,8 +113,8 @@ provider-dependent test.
 | Field | Verified value |
 | --- | --- |
 | Project | `delealufejoel-4184s-projects/jestor` |
-| Deployment | `dpl_6mfRwfRyudtPezfRurLprwhiGsV7` |
-| Inspect URL | `https://vercel.com/delealufejoel-4184s-projects/jestor/6mfRwfRyudtPezfRurLprwhiGsV7` |
+| Deployment | `dpl_ESybnXTRQf5iv3TFqNohbofT5tHv` |
+| Inspect URL | `https://vercel.com/delealufejoel-4184s-projects/jestor/ESybnXTRQf5iv3TFqNohbofT5tHv` |
 | Production alias | `https://jestor.vercel.app` |
 | Ready state | `READY` |
 | Effective public contract bundle check | new address present, old address absent |
