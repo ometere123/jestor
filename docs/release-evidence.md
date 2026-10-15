@@ -16,13 +16,15 @@ animations, submitted transaction hashes, or mock adapters as proof.
 | Contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
 | Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
 | Deployment status | `FINALIZED`, `MAJORITY_AGREE`, leader `SUCCESS` |
-| Contract source bytes | `93796` |
-| Contract source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
+| Retrieved source bytes | `93796` (raw Studionet response) |
+| Retrieved source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
+| Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` (LF-normalized) |
 
-The deployed source was retrieved from Studionet and compared byte-for-byte
-with `contract/jestor_arena.py`; both the byte count and SHA-256 matched. The
-deployment is a new state baseline. Earlier deployments remain historical
-references and were not represented as migrated state. The immediately prior
+The deployed source was retrieved from Studionet and compared with
+`contract/jestor_arena.py` after normalizing CRLF/LF line endings. The
+canonical LF bytes and SHA-256 matched exactly. The deployment is a new state
+baseline. Earlier deployments remain historical references and were not
+represented as migrated state. The immediately prior
 candidate `0x46D843ee0e405Aba61B81bb3eFF1C0D29eCD0a3C` was superseded after
 the second audit found that its bracket settlement path could deadlock before
 materializing a final; it is not the production address.

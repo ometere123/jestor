@@ -19,8 +19,8 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | GenVM linter | `genvm-linter==0.11.0` |
 | Verified Arena Circuit contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
 | Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
-| Verified source bytes | `93796` |
-| Verified source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
+| Retrieved deployed source bytes | `93796` (raw Studionet response) |
+| Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` (LF-normalized) |
 | Production frontend | [jestor.vercel.app](https://jestor.vercel.app) |
 
 The release is one cohesive state machine in

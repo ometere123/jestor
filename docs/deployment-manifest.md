@@ -16,16 +16,17 @@ mock adapter, or a UI animation as proof.
 | Contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
 | Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
 | Deployment receipt | `FINALIZED`, `MAJORITY_AGREE`, leader `SUCCESS` |
-| Retrieved source bytes | `93796` (CRLF byte representation) |
-| Retrieved/source exact SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
+| Retrieved source bytes | `93796` (raw response byte representation) |
+| Retrieved source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
 | Canonical Git source bytes | `92574` (LF blob) |
-| Canonical Git source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` |
+| Canonical/deployed normalized SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` |
 | Canonical Git blob | `6bbe25764c37b28b0f5b70a6e5ee13cd32f8f6c7` |
 | Code commit containing deployed contract | `489cba3` |
 | Release commit containing deployed frontend | `b0503f0` |
 
-The retrieved source was compared byte-for-byte with the release working
-source before release. The previous deployment
+The retrieved source was compared with the release working source after
+normalizing CRLF/LF line endings; the canonical bytes and SHA-256 matched.
+The previous deployment
 `0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` remains a historical baseline;
 there is no automatic migration of its state.
 
