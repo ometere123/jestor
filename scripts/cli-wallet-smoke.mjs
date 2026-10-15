@@ -59,6 +59,21 @@ async function cli(args) {
   throw new Error(`CLI failed (${args.join(" ")}).`);
 }
 
+async function finalizedReceipt(hash) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      return await cli(["receipt", hash, "--rpc", RPC, "--status", "FINALIZED"]);
+    } catch (error) {
+      const details = error instanceof Error ? error.message : String(error);
+      if (!/fetch failed|connect timeout|ECONNRESET|socket hang up|network/i.test(details) || attempt === 4) throw error;
+      const delay = 10000 * (attempt + 1);
+      console.log(`Receipt RPC unavailable; retrying the same hash in ${delay / 1000}s.`);
+      await sleep(delay);
+    }
+  }
+  throw new Error(`Unable to retrieve finalized receipt for ${hash}.`);
+}
+
 async function selectAccount(name) {
   await cli(["account", "use", name]);
 }
@@ -103,7 +118,7 @@ async function write(accountName, method, args = [], options = {}) {
   await selectAccount(accountName);
   const output = await cli(["write", CONTRACT, method, "--rpc", RPC, "--args", ...args]);
   const hash = extractHash(output);
-  const receipt = await cli(["receipt", hash, "--rpc", RPC, "--status", "FINALIZED"]);
+  const receipt = await finalizedReceipt(hash);
   const evidence = receiptEvidence(receipt);
   const resultName = receiptResultName(receipt);
   if (!evidence.finalized) throw new Error(`${method} did not reach FINALIZED (${hash}; ${receiptSummary(receipt)}).`);
