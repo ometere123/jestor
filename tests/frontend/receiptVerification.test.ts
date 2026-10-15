@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { extractReturnValueFromReceipt, receiptEvidence, verifyFinalizedTransaction } from "../../lib/genlayer/client";
+import { extractReturnValueFromReceipt, receiptEvidence, verifyFinalizedChallengeTransaction, verifyFinalizedTransaction } from "../../lib/genlayer/client";
 
 describe("verifiable verdict evidence", () => {
   it("recognizes finalized majority-agree receipt evidence", () => {
@@ -24,6 +24,12 @@ describe("verifiable verdict evidence", () => {
 
   it("does not accept a forged hash without configured authoritative contract state", async () => {
     const verification = await verifyFinalizedTransaction("result-123", `0x${"1".repeat(64)}`);
+    expect(verification.verified).toBe(false);
+    expect(verification.reason).toMatch(/configured contract|authoritative/i);
+  });
+
+  it("does not accept a challenge hash without a finalized challenge relationship", async () => {
+    const verification = await verifyFinalizedChallengeTransaction("result-123", `0x${"2".repeat(64)}`);
     expect(verification.verified).toBe(false);
     expect(verification.reason).toMatch(/configured contract|authoritative/i);
   });

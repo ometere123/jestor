@@ -38,9 +38,12 @@ export default function DuelCard({ duel, currentAddress, onJoin, onReveal, onCan
   const joinExpired = duel.status === "waiting" && Boolean(duel.join_deadline && now > duel.join_deadline);
   const revealExpired = duel.status === "reveal" && Boolean(duel.reveal_deadline && now > duel.reveal_deadline);
   const canRecover = joinExpired || revealExpired;
+  const joinRemaining = duel.join_deadline ? Math.max(0, duel.join_deadline - now) : null;
+  const revealRemaining = duel.reveal_deadline ? Math.max(0, duel.reveal_deadline - now) : null;
+  const formatRemaining = (seconds: number) => seconds <= 0 ? "expired" : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 
   return (
-    <div className="border-2 border-[#7A35FF] bg-white p-3 shadow-[3px_3px_0px_#121212] space-y-2">
+    <div data-testid={`duel-card-${duel.id}`} data-duel-id={duel.id} data-duel-status={duel.status} className="border-2 border-[#7A35FF] bg-white p-3 shadow-[3px_3px_0px_#121212] space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-mono text-[#6B6257]">#{duel.id.slice(0, 8)}</span>
         <Badge variant={duel.status === "resolved" ? "safe" : duel.status === "waiting" ? "blue" : "chaos"}>
@@ -49,6 +52,9 @@ export default function DuelCard({ duel, currentAddress, onJoin, onReveal, onCan
       </div>
 
       <p className="text-xs font-bold text-[#121212]">{duel.prompt_text || "No prompt text"}</p>
+
+      {duel.status === "waiting" && joinRemaining !== null && <p className="text-[11px] font-mono text-[#6B6257]" role="status" aria-live="polite">Join deadline: <time dateTime={new Date((duel.join_deadline ?? 0) * 1000).toISOString()}>{formatRemaining(joinRemaining)}</time></p>}
+      {(duel.status === "reveal" || duel.status === "ready") && revealRemaining !== null && <p className="text-[11px] font-mono text-[#6B6257]" role="status" aria-live="polite">Reveal deadline: <time dateTime={new Date((duel.reveal_deadline ?? 0) * 1000).toISOString()}>{formatRemaining(revealRemaining)}</time></p>}
 
       <div className="grid grid-cols-2 gap-2 text-xs font-mono">
         <div className="border border-[#C99A6B] p-1">

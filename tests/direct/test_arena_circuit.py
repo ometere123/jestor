@@ -110,6 +110,24 @@ def mock_challenge_restore_tournament(vm):
     )
 
 
+def mock_challenge_keep_duel(vm):
+    vm.mock_llm(
+        r"Independently rejudge a finalized Jestor result.*",
+        json.dumps({
+            "result_kind": "duel",
+            "decision": "KEEP",
+            "new_delta": 0,
+            "new_a_delta": 60,
+            "new_b_delta": 10,
+            "new_winner": "A",
+            "new_safety_class": "SAFE",
+            "new_allowed": True,
+            "new_valid": True,
+            "reason": "Independent reassessment preserves the original legitimate result.",
+        }),
+    )
+
+
 def mock_remix(vm):
     vm.mock_llm(
         r"Independently assess a transformative remix.*",
@@ -305,6 +323,196 @@ def test_balance_correction_respects_zero_floor_and_daily_accounting(direct_vm, 
     corrected = arena._correct_effect(address(direct_alice), earned, 0, 75, 0)
     assert corrected == 0
     assert arena.get_balance(address(direct_alice)) == 0
+
+
+def test_daily_gain_cap_counts_partial_awards_and_cannot_be_replayed(direct_vm, direct_deploy, direct_alice):
+    arena = direct_deploy(CONTRACT)
+    direct_vm.sender = direct_alice
+    arena.create_profile("gain-boundary")
+    addr = address(direct_alice)
+    assert arena._apply(addr, 170, 200, 0, "gain-1") == 170
+    assert arena._apply(addr, 20, 200, 0, "gain-2") == 10
+    assert arena._apply(addr, 1, 200, 0, "gain-3") == 0
+    assert arena.get_balance(addr) == 180
+    assert int(arena.daily_gain[addr]) == 180
+    with direct_vm.expect_revert("already settled"):
+        arena._apply(addr, 1, 200, 0, "gain-3")
+
+
+def test_daily_loss_cap_zero_floor_and_repeated_requests_are_exact(direct_vm, direct_deploy, direct_alice):
+    arena = direct_deploy(CONTRACT)
+    direct_vm.sender = direct_alice
+    arena.create_profile("loss-boundary")
+    addr = address(direct_alice)
+    arena.balances[addr] = 20
+    arena.daily_gain[addr] = 0
+    arena.daily_loss[addr] = 0
+    arena.daily_reset[addr] = arena._day()
+    assert arena._apply(addr, -40, 0, -100, "loss-floor") == -20
+    assert arena.get_balance(addr) == 0
+    assert int(arena.daily_loss[addr]) == -20
+
+    arena.balances[addr] = 100
+    arena.daily_loss[addr] = 0
+    assert arena._apply(addr, -35, 0, -100, "loss-1") == -35
+    assert arena._apply(addr, -40, 0, -100, "loss-2") == -15
+    assert arena._apply(addr, -1, 0, -100, "loss-3") == 0
+    assert arena.get_balance(addr) == 50
+    assert int(arena.daily_loss[addr]) == -50
+
+    arena.balances[addr] = 0
+    arena.daily_loss[addr] = 0
+    assert arena._apply(addr, -100, 0, -100, "loss-zero") == 0
+    assert int(arena.daily_loss[addr]) == 0
+
+
+def test_same_day_correction_releases_only_its_effect_and_is_single_use(direct_vm, direct_deploy, direct_alice):
+    arena = direct_deploy(CONTRACT)
+    direct_vm.sender = direct_alice
+    arena.create_profile("correction-boundary")
+    addr = address(direct_alice)
+    assert arena._apply(addr, 100, 200, 0, "correct-me") == 100
+    assert arena._apply(addr, 80, 200, 0, "keep-me") == 80
+    assert arena._correct_effect(addr, 100, 70, 200, 0, "correct-me") == 70
+    assert arena.get_balance(addr) == 150
+    assert int(arena.daily_gain[addr]) == 150
+    ledger = json.loads(arena.effect_ledger["correct-me|" + addr])
+    assert ledger["original_delta"] == 100
+    assert ledger["current_delta"] == 70
+    assert ledger["corrected"] is True
+    assert ledger["correction_count"] == 1
+    with direct_vm.expect_revert("already corrected"):
+        arena._correct_effect(addr, 100, 0, 200, 0, "correct-me")
+
+
+def test_previous_day_correction_cannot_bypass_current_day_caps(direct_vm, direct_deploy, direct_alice):
+    arena = direct_deploy(CONTRACT)
+    direct_vm.sender = direct_alice
+    arena.create_profile("cross-day")
+    addr = address(direct_alice)
+    assert arena._apply(addr, 80, 200, 0, "previous-day") == 80
+    ledger_key = "previous-day|" + addr
+    ledger = json.loads(arena.effect_ledger[ledger_key])
+    ledger["current_day"] = arena._day() - 1
+    arena.effect_ledger[ledger_key] = json.dumps(ledger)
+    arena.daily_gain[addr] = arena.DAILY_GAIN_CAP
+    assert arena._correct_effect(addr, 80, 100, 200, 0, "previous-day") == 0
+    assert arena.get_balance(addr) == 0
+    assert int(arena.daily_gain[addr]) == arena.DAILY_GAIN_CAP
+    corrected = json.loads(arena.effect_ledger[ledger_key])
+    assert corrected["correction_from_day"] != corrected["correction_day"]
+
+
+def test_previous_day_loss_correction_restores_balance_without_current_day_gain(direct_vm, direct_deploy, direct_alice):
+    arena = direct_deploy(CONTRACT)
+    direct_vm.sender = direct_alice
+    arena.create_profile("cross-day-loss")
+    addr = address(direct_alice)
+    arena.balances[addr] = 100
+    arena.daily_gain[addr] = 0
+    arena.daily_loss[addr] = 0
+    arena.daily_reset[addr] = arena._day()
+    assert arena._apply(addr, -30, 0, -100, "previous-day-loss") == -30
+    key = "previous-day-loss|" + addr
+    ledger = json.loads(arena.effect_ledger[key])
+    ledger["current_day"] = arena._day() - 1
+    arena.effect_ledger[key] = json.dumps(ledger)
+    # Model a UTC-day rollover before the challenge correction arrives.
+    arena.daily_reset[addr] = arena._day()
+    arena.daily_gain[addr] = 0
+    arena.daily_loss[addr] = 0
+    assert arena._correct_effect(addr, -30, 0, 0, -100, "previous-day-loss") == 0
+    assert arena.get_balance(addr) == 100
+    assert int(arena.daily_gain[addr]) == 0
+    assert int(arena.daily_loss[addr]) == 0
+    corrected = json.loads(arena.effect_ledger[key])
+    assert corrected["balance_reversal"] == 30
+    assert corrected["correction_from_day"] != corrected["correction_day"]
+
+
+def test_correction_history_records_actual_zero_floor_reversal_not_requested_delta(direct_vm, direct_deploy, direct_alice):
+    arena = direct_deploy(CONTRACT)
+    direct_vm.sender = direct_alice
+    arena.create_profile("floor-correction")
+    addr = address(direct_alice)
+    arena.balances[addr] = 20
+    arena.daily_gain[addr] = 0
+    arena.daily_loss[addr] = 0
+    arena.daily_reset[addr] = arena._day()
+    assert arena._apply(addr, 50, 100, 0, "partially-spendable") == 50
+    assert arena._apply(addr, -50, 0, -100, "spend-before-correction") == -50
+    assert arena.get_balance(addr) == 20
+    replacement = arena._correct_effect(addr, 50, 0, 100, 0, "partially-spendable")
+    assert replacement == 0
+    assert arena.get_balance(addr) == 0
+    assert arena._correction_change(addr, "partially-spendable", 50, replacement) == -20
+
+
+def test_challenge_correction_preserves_original_verdict_and_balance_history(direct_vm, direct_deploy, direct_accounts):
+    arena = direct_deploy(CONTRACT)
+    author, challenger = direct_accounts[:2]
+    create_profiles(arena, direct_vm, [author, challenger])
+    prompt_id = create_prompt(arena, direct_vm, author)
+    direct_vm.sender = author
+    mock_caption(direct_vm)
+    result_id = arena.submit_caption(prompt_id, "A safe caption whose reward is corrected once.")
+    original = json.loads(arena.submissions[result_id])["original_verdict"]
+    addr = address(author)
+    before_events = len(json.loads(arena.career_logs[addr]))
+    direct_vm.sender = challenger
+    mock_challenge_block(direct_vm)
+    arena.challenge_verdict(result_id, "Reassess the unsafe content and reverse its reward.")
+    current = arena.get_submission(result_id)
+    assert current["original_verdict"] == original
+    assert current["balance_delta"] == 0
+    assert arena.get_balance(addr) == 0
+    assert len(json.loads(arena.career_logs[addr])) == before_events + 1
+    assert json.loads(arena.effect_ledger[result_id + "|" + addr])["correction_count"] == 1
+    with direct_vm.expect_revert("already challenged"):
+        arena.challenge_verdict(result_id, "A second settlement must be rejected.")
+
+
+def test_keep_challenge_does_not_replay_previous_day_competitive_rewards(direct_vm, direct_deploy, direct_accounts):
+    arena = direct_deploy(CONTRACT)
+    player_a, player_b, challenger = direct_accounts[:3]
+    create_profiles(arena, direct_vm, [player_a, player_b, challenger])
+    a = address(player_a)
+    b = address(player_b)
+    duel_id = "keep-previous-day-duel"
+    arena._apply(a, 60, 60, 0, duel_id + ":A")
+    arena._apply(b, 10, 10, 0, duel_id + ":B")
+    a_ledger = json.loads(arena.effect_ledger[duel_id + ":A|" + a])
+    b_ledger = json.loads(arena.effect_ledger[duel_id + ":B|" + b])
+    a_ledger["current_day"] = arena._day() - 1
+    b_ledger["current_day"] = arena._day() - 1
+    arena.effect_ledger[duel_id + ":A|" + a] = json.dumps(a_ledger)
+    arena.effect_ledger[duel_id + ":B|" + b] = json.dumps(b_ledger)
+    # The current UTC day is exhausted independently of the old settlement.
+    arena.daily_gain[a] = arena.DAILY_GAIN_CAP
+    arena.daily_gain[b] = arena.DAILY_GAIN_CAP
+    arena.duels[duel_id] = json.dumps({
+        "id": duel_id,
+        "player_a": a,
+        "player_b": b,
+        "status": "resolved",
+        "finalized": True,
+        "challenged": False,
+        "challenge_eligible_until": arena._now() + 900,
+        "verdict": {"winner": "A", "a_delta": 60, "b_delta": 10, "actual_a_delta": 60, "actual_b_delta": 10, "safety_class": "SAFE"},
+        "original_verdict": {"winner": "A", "a_delta": 60, "b_delta": 10, "actual_a_delta": 60, "actual_b_delta": 10, "safety_class": "SAFE"},
+    })
+    direct_vm.sender = challenger
+    mock_challenge_keep_duel(direct_vm)
+    arena.challenge_verdict(duel_id, "Independently reassess the prior duel without changing a legitimate settlement.")
+    updated = arena.get_duel(duel_id)
+    assert updated["verdict"]["winner"] == "A"
+    assert updated["verdict"]["actual_a_delta"] == 60
+    assert updated["verdict"]["actual_b_delta"] == 10
+    assert arena.get_balance(a) == 60
+    assert arena.get_balance(b) == 10
+    history = arena.get_verdict_history(duel_id, 12)
+    assert history[-1]["phase"] == "challenge"
+    assert history[-1]["balance_changes"] == {a: 0, b: 0}
 
 
 def test_leaderboard_is_balance_ranked_not_insertion_order(direct_vm, direct_deploy, direct_accounts):

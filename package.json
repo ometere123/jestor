@@ -9,6 +9,8 @@
     "lint": "eslint",
     "test:frontend:unit": "vitest run tests/frontend --environment node",
     "test:direct": "python -m pytest tests/direct -q",
+    "test:e2e": "playwright test",
+    "test:e2e:live": "cross-env JESTOR_E2E_LIVE=true playwright test tests/e2e/live.spec.ts",
     "test:frontend": "npm run test:frontend:unit && npm run lint && npx tsc --noEmit --pretty false && npm run build"
   },
   "dependencies": {
@@ -25,10 +27,12 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "genlayer": "0.39.1",

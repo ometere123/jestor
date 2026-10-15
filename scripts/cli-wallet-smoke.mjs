@@ -153,6 +153,32 @@ async function writeUntilAgreement(accountName, method, args = [], attempts = 3)
   throw new Error(`${method} exhausted ${attempts} finalized disagreement retries.`);
 }
 
+async function challengeUntilSettled(accountName, resultId, text) {
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const result = await write(accountName, "challenge_verdict", [resultId, text], {
+      retryOnDisagreement: true,
+      allowError: true,
+    });
+    if (result.disagreement) {
+      if (attempt < 5) {
+        console.log(`Retrying challenge_verdict after finalized semantic disagreement (${attempt}/5).`);
+        await sleep(5000);
+        continue;
+      }
+      throw new Error("challenge_verdict exhausted 5 finalized disagreement retries.");
+    }
+    if (result.contractError) {
+      if (/Challenge window expired/i.test(result.receipt)) {
+        console.log(`PASS expected finalized challenge expiry for ${resultId}; state remains unchanged.`);
+        return { expired: true, result };
+      }
+      throw new Error(`challenge_verdict finalized with an unexpected contract error (${result.hash}; ${receiptSummary(result.receipt)}).`);
+    }
+    return { expired: false, result };
+  }
+  throw new Error("challenge_verdict did not settle.");
+}
+
 async function read(method, args = []) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
@@ -228,7 +254,7 @@ export async function runSmoke() {
     console.log(`PASS reuse accepted finalized caption ${caption.id}`);
   } else {
     const captionText = process.env.GL_CAPTION_TEXT ?? "The punchline waited for validator quorum, filed an appeal, and still got rejected for insufficient gas; the goose called that a career milestone.";
-    await write(names[0], "submit_caption", [prompt.id, captionText]);
+    await writeUntilAgreement(names[0], "submit_caption", [prompt.id, captionText], 5);
     const recent = await read("get_recent_submissions", [prompt.id, 30]);
     caption = recent.find((item) => item?.text === captionText);
     if (!caption?.id || !caption.finalized) throw new Error("Caption readback failed.");
@@ -245,10 +271,10 @@ export async function runSmoke() {
     console.log(`PASS reuse accepted finalized roast ${roastId}`);
   } else {
     const roastText = process.env.GL_ROAST_TEXT ?? "My debugging strategy is to rename the bug and call it architecture.";
-    await write(names[1], "submit_roast_self", [prompt.id, roastText]);
+    await writeUntilAgreement(names[1], "submit_roast_self", [prompt.id, roastText], 5);
     roastId = await read("get_latest_submission_id", [addresses[1]]);
   }
-  if (!roastAlreadyChallenged) await write(names[3], "challenge_verdict", [roastId, "Reassess the roast safety, outcome, and deterministic point effect."]);
+  if (!roastAlreadyChallenged) await writeUntilAgreement(names[3], "challenge_verdict", [roastId, "Reassess the roast safety, outcome, and deterministic point effect."], 5);
   else console.log(`PASS reuse settled challenge for ${roastId}`);
   const challenged = await read("get_verdict", [roastId]);
   if (!challenged?.challenged) throw new Error("Challenge correction was not settled.");
@@ -259,7 +285,7 @@ export async function runSmoke() {
     }
     console.log(`PASS reuse finalized chaos ${existingChaos.id}`);
   } else {
-    await write(names[2], "invoke_chaos_action", [prompt.id, "A harmless confetti storm celebrates a joke that survived review."]);
+    await writeUntilAgreement(names[2], "invoke_chaos_action", [prompt.id, "A harmless confetti storm celebrates a joke that survived review."], 5);
   }
   let remixId;
   if (process.env.GL_REMIX_ID) {
@@ -271,7 +297,7 @@ export async function runSmoke() {
     console.log(`PASS reuse accepted finalized remix ${remixId}`);
   } else {
     const remixText = process.env.GL_REMIX_TEXT ?? "The moon goose became a theatrical lawyer, while the teacup referee turned the punchline into a filing-cabinet opera with a crown-wearing chorus.";
-    await write(names[2], "submit_remix", [prompt.id, caption.id, remixText]);
+    await writeUntilAgreement(names[2], "submit_remix", [prompt.id, caption.id, remixText], 5);
     remixId = await read("get_latest_submission_id", [addresses[2]]);
   }
   await write(names[2], "submit_remix", [prompt.id, caption.id, caption.text], { expectError: true });
@@ -355,15 +381,24 @@ export async function runSmoke() {
         continue;
       }
       try {
-        await writeUntilAgreement(tournamentChallenger, "challenge_verdict", [`${tournament.id}:${index}`, "Reassess this settled semifinal independently and preserve the winner only if the safety and decision-critical substance agree."], 5);
+        await challengeUntilSettled(tournamentChallenger, `${tournament.id}:${index}`, "Reassess this settled semifinal independently and preserve the winner only if the safety and decision-critical substance agree.");
       } catch (error) {
         if (!(error instanceof Error) || !/exhausted .*disagreement retries/i.test(error.message)) throw error;
         console.log(`PASS semifinal ${index} remained unsettled after bounded semantic disagreement retries; waiting for its permissionless expiry.`);
         await waitUntil(challengeUntil + 1, `semifinal ${index} challenge window`);
       }
+      // A challenge can cross its deadline while the bounded consensus
+      // retries are in flight.  The finalized contract rejection is an
+      // expected, state-neutral outcome; advance the bracket permissionlessly
+      // before attempting the final index.
+      const afterChallenge = await read("get_tournament", [tournament.id]);
+      if (afterChallenge.stage === "semifinals" && Math.floor(Date.now() / 1000) > challengeUntil) {
+        await writeUntilAgreement(names[3], "advance_tournament", [tournament.id], 5);
+      }
     }
   } else {
     await waitUntil(Math.max(semis.matches[0].challenge_eligible_until, semis.matches[1].challenge_eligible_until) + 1, "semifinal challenge windows");
+    await writeUntilAgreement(names[3], "advance_tournament", [tournament.id], 5);
   }
   let afterFinal = await read("get_tournament", [tournament.id]);
   if (!afterFinal.matches?.[2] || afterFinal.matches[2].status === "pending") {
@@ -375,7 +410,7 @@ export async function runSmoke() {
     const challengeUntil = Number(afterFinal.matches[2].challenge_eligible_until);
     if (Math.floor(Date.now() / 1000) <= challengeUntil) {
       try {
-        await writeUntilAgreement(tournamentChallenger, "challenge_verdict", [`${tournament.id}:2`, "Reassess this settled final independently and preserve a legitimate winner only if the safety and decision-critical substance agree."], 5);
+        await challengeUntilSettled(tournamentChallenger, `${tournament.id}:2`, "Reassess this settled final independently and preserve a legitimate winner only if the safety and decision-critical substance agree.");
       } catch (error) {
         if (!(error instanceof Error) || !/exhausted .*disagreement retries/i.test(error.message)) throw error;
         console.log("PASS final remained unsettled after bounded semantic disagreement retries; waiting for permissionless expiry.");

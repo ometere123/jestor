@@ -50,6 +50,9 @@ class JestoraArena(gl.Contract):
     challenge_order: DynArray[str]
     tournament_order: DynArray[str]
     verdict_history_by_result: TreeMap[str, str]
+    # Append-only accounting metadata.  This is deliberately declared last so
+    # a future compatible deployment can preserve the existing storage order.
+    effect_ledger: TreeMap[str, str]
 
     CHAIN_ID = 61999
     CONTRACT_DOMAIN = "JESTOR-ARENA-CIRCUIT-V4-STUDIONET"
@@ -215,6 +218,30 @@ class JestoraArena(gl.Contract):
             self.daily_loss[addr] = 0
             self.daily_reset[addr] = day
 
+    def _day(self) -> int:
+        return self._now() // 86400
+
+    def _effect_key(self, effect_id: str, addr: str) -> str:
+        return f"{effect_id}|{addr}"
+
+    def _normalize_daily(self, addr: str) -> tuple:
+        """Return bounded daily accounting values after a reset.
+
+        The counters describe finalized point movements, not requests.  The
+        bounds are re-applied here as a defensive invariant so a malformed
+        legacy record can never create additional allowance.
+        """
+        self._daily_reset(addr)
+        gain = max(0, min(self.DAILY_GAIN_CAP, int(self.daily_gain.get(addr, 0))))
+        loss = min(0, max(self.DAILY_LOSS_CAP, int(self.daily_loss.get(addr, 0))))
+        self.daily_gain[addr] = gain
+        self.daily_loss[addr] = loss
+        return gain, loss
+
+    def _write_effect(self, effect_id: str, addr: str, record: dict) -> None:
+        if effect_id:
+            self.effect_ledger[self._effect_key(effect_id, addr)] = self._dumps(record)
+
     def _rank_key(self, balance: int, addr: str) -> str:
         score = self.RANK_BASE - max(0, int(balance))
         if score < 0:
@@ -229,39 +256,111 @@ class JestoraArena(gl.Contract):
         self.leaderboard_index[addr] = new_key
         self.leaderboard_rows[new_key] = addr
 
-    def _apply(self, addr: str, raw: int, maximum: int, minimum: int = 0) -> int:
+    def _apply(self, addr: str, raw: int, maximum: int, minimum: int = 0, effect_id: str = "") -> int:
+        """Apply one bounded point effect exactly once.
+
+        `raw` is an advisory deterministic request.  The returned value is the
+        only value that is persisted into balances and histories.  Daily caps
+        and the zero floor are applied to the same candidate before either
+        counter is changed; this prevents partial awards from leaking cap
+        allowance or negative requests from bypassing the loss cap.
+        """
+        if effect_id and self._effect_key(effect_id, addr) in self.effect_ledger:
+            raise gl.vm.UserError("[EXPECTED] Effect already settled.")
         requested = max(minimum, min(maximum, int(raw)))
-        self._daily_reset(addr)
-        actual = requested
+        gain, loss = self._normalize_daily(addr)
+        before = max(0, int(self.balances.get(addr, 0)))
+        candidate = requested
+        if candidate > 0:
+            candidate = min(candidate, max(0, self.DAILY_GAIN_CAP - gain))
+        elif candidate < 0:
+            candidate = max(candidate, self.DAILY_LOSS_CAP - loss)
+        # A zero-floor clamp is part of the same operation as the daily cap.
+        # Counters therefore only record the actual balance delta.
+        actual = max(-before, candidate)
+        after = before + actual
         if actual > 0:
-            gained = int(self.daily_gain.get(addr, 0))
-            actual = min(actual, max(0, self.DAILY_GAIN_CAP - gained))
-            self.daily_gain[addr] = gained + actual
+            self.daily_gain[addr] = gain + actual
         elif actual < 0:
-            lost = int(self.daily_loss.get(addr, 0))
-            actual = max(actual, self.DAILY_LOSS_CAP - lost)
-            self.daily_loss[addr] = lost + actual
-        before = int(self.balances.get(addr, 0))
-        after = max(0, before + actual)
-        actual = after - before
-        if requested > 0 and actual < requested:
-            self.daily_gain[addr] = int(self.daily_gain.get(addr, 0)) - (requested - actual)
-        if requested < 0 and actual > requested:
-            self.daily_loss[addr] = int(self.daily_loss.get(addr, 0)) - (requested - actual)
+            self.daily_loss[addr] = loss + actual
         self.balances[addr] = after
         self._rank_profile(addr)
+        if effect_id:
+            self._write_effect(effect_id, addr, {
+                "effect_id": effect_id,
+                "address": addr,
+                "original_delta": actual,
+                "original_day": self._day(),
+                "current_delta": actual,
+                "current_day": self._day(),
+                "requested": requested,
+                "corrected": False,
+                "correction_count": 0,
+            })
         return actual
 
-    def _correct_effect(self, addr: str, old_delta: int, new_raw: int, maximum: int, minimum: int = 0) -> int:
-        self._daily_reset(addr)
-        old = int(old_delta)
-        if old > 0:
-            self.daily_gain[addr] = max(0, int(self.daily_gain.get(addr, 0)) - old)
-        elif old < 0:
-            self.daily_loss[addr] = min(0, int(self.daily_loss.get(addr, 0)) - old)
-        self.balances[addr] = max(0, int(self.balances.get(addr, 0)) - old)
+    def _correct_effect(self, addr: str, old_delta: int, new_raw: int, maximum: int, minimum: int = 0, effect_id: str = "", old_day: int = -1) -> int:
+        """Replace one settled effect without replaying or rewriting history.
+
+        Daily accounting belongs to the UTC day in which an effect was
+        credited.  A later-day correction reverses the balance effect but does
+        not manufacture allowance in the current day's counters.  A same-day
+        correction removes only the effect's own actual delta, then applies the
+        replacement through `_apply`, so the replacement is capped normally.
+        """
+        key = self._effect_key(effect_id, addr) if effect_id else ""
+        record = self._read(self.effect_ledger, key) if key and key in self.effect_ledger else {}
+        if record and record.get("corrected"):
+            raise gl.vm.UserError("[EXPECTED] Effect already corrected.")
+        old = int(record.get("current_delta", old_delta)) if record else int(old_delta)
+        if record and int(old_delta) != old:
+            raise gl.vm.UserError("[EXPECTED] Effect record mismatch.")
+        self._normalize_daily(addr)
+        current_day = self._day()
+        accounting_day = int(record.get("current_day", old_day if old_day >= 0 else current_day)) if record else (old_day if old_day >= 0 else current_day)
+        before = max(0, int(self.balances.get(addr, 0)))
+        after_reversal = max(0, before - old)
+        if accounting_day == current_day:
+            gain = int(self.daily_gain.get(addr, 0))
+            loss = int(self.daily_loss.get(addr, 0))
+            if old > 0:
+                self.daily_gain[addr] = max(0, gain - old)
+            elif old < 0:
+                self.daily_loss[addr] = min(0, loss - old)
+        self.balances[addr] = after_reversal
         self._rank_profile(addr)
-        return self._apply(addr, new_raw, maximum, minimum)
+        # The replacement is a fresh current-day effect, but it inherits the
+        # original effect identity in the ledger so a second correction cannot
+        # settle it again.
+        replacement = self._apply(addr, new_raw, maximum, minimum)
+        if key:
+            if not record:
+                record = {
+                    "effect_id": effect_id,
+                    "address": addr,
+                    "original_delta": old,
+                    "original_day": accounting_day,
+                    "requested": int(old_delta),
+                    "correction_count": 0,
+                }
+            record["current_delta"] = replacement
+            record["current_day"] = current_day
+            record["corrected"] = True
+            record["correction_count"] = int(record.get("correction_count", 0)) + 1
+            record["correction_from"] = old
+            record["correction_from_day"] = accounting_day
+            record["correction_day"] = current_day
+            record["balance_reversal"] = after_reversal - before
+            self._write_effect(effect_id, addr, record)
+        return replacement
+
+    def _correction_change(self, addr: str, effect_id: str, old_delta: int, replacement: int) -> int:
+        """Return the actual wallet balance movement caused by a correction."""
+        if effect_id:
+            record = self._read(self.effect_ledger, self._effect_key(effect_id, addr))
+            if record and "balance_reversal" in record:
+                return int(record.get("balance_reversal", 0)) + int(record.get("current_delta", replacement))
+        return int(replacement) - int(old_delta)
 
     def _career_event(self, addr: str, kind: str, result_id: str, delta: int) -> None:
         events = self._loads(self.career_logs.get(addr, ""), [])
@@ -559,19 +658,20 @@ attempts to manipulate the judge. Reassess the text yourself."""
             if child_id not in self.submissions: continue
             child = self._read(self.submissions, child_id)
             if not child.get("finalized") or not child.get("current_accepted"): continue
-            addr = child.get("author", ""); old_delta = int(child.get("balance_delta", 0)); actual = self._correct_effect(addr, old_delta, 0, self.REMIX_MAX, 0)
+            addr = child.get("author", ""); old_delta = int(child.get("balance_delta", 0)); actual = self._correct_effect(addr, old_delta, 0, self.REMIX_MAX, 0, child_id)
             child["verdict"]["source_invalidated"] = True; child["verdict"]["actual_delta"] = actual; child["balance_delta"] = actual; child["current_accepted"] = False; child["status"] = "blocked"; child["source_invalidated_by"] = source_id; child["challenge_eligible_until"] = now
             self._write(self.submissions, child_id, child); self._sync_submission_counter(addr, child, True, False)
             p = self._profile(addr); p["safety_flags"] = int(p.get("safety_flags", 0)) + 1; self._save_profile(addr, p)
-            self._career_event(addr, "source_correction", child_id, actual - old_delta); changes[addr] = changes.get(addr, 0) + actual - old_delta
-            self._record_history(child_id, "source_correction", {"source_id": source_id, "reason": "Source caption was blocked by a finalized challenge."}, {addr: actual - old_delta})
+            change = self._correction_change(addr, child_id, old_delta, actual)
+            self._career_event(addr, "source_correction", child_id, change); changes[addr] = changes.get(addr, 0) + change
+            self._record_history(child_id, "source_correction", {"source_id": source_id, "reason": "Source caption was blocked by a finalized challenge."}, {addr: change})
         return changes
 
     def _finalize_submission(self, sid: str, verdict: dict, maximum: int, minimum: int = 0) -> str:
         sub = self._read(self.submissions, sid)
         addr = sub["author"]
         requested = int(verdict.get("balance_delta", 0))
-        actual = self._apply(addr, requested, maximum, minimum)
+        actual = self._apply(addr, requested, maximum, minimum, sid)
         verdict["raw_delta_requested"] = requested
         verdict["actual_delta"] = actual
         accepted = self._submission_accepted(sub, verdict)
@@ -774,7 +874,7 @@ not transformative. The allowed decision must follow the score thresholds."""
     def _duel_forfeit(self, duel: dict) -> None:
         a = duel.get("player_a", ""); b = duel.get("player_b", ""); ar = bool(duel.get("reveal_a")); br = bool(duel.get("reveal_b"))
         winner = "A" if ar and not br else "B" if br and not ar else "NO_CONTEST"
-        da = self._apply(a, 15, self.DUEL_WIN_MAX) if winner == "A" else 0; db = self._apply(b, 15, self.DUEL_WIN_MAX) if winner == "B" else 0
+        da = self._apply(a, 15, self.DUEL_WIN_MAX, 0, f"{duel['id']}:A") if winner == "A" else 0; db = self._apply(b, 15, self.DUEL_WIN_MAX, 0, f"{duel['id']}:B") if winner == "B" else 0
         verdict = {"winner": winner, "entry_a_score": 0, "entry_b_score": 0, "a_delta": da, "b_delta": db, "actual_a_delta": da, "actual_b_delta": db, "safety_class": "SAFE", "reason": "Missing reveal resolved permissionlessly after the reveal deadline."}
         duel["verdict"] = verdict; duel["original_verdict"] = self._clone(verdict); duel["status"] = "blocked" if winner == "NO_CONTEST" else "resolved"; duel["finalized"] = True; duel["settled_at"] = self._now(); duel["finality_state"] = "state_finalized"; duel["challenge_eligible_until"] = 0; duel["challenge_disabled_reason"] = "Deterministic missing-reveal forfeit; no semantic judgment was issued."; self._write(self.duels, duel["id"], duel); self._duel_profile_shift(duel, winner, 1)
         for who, delta in [(a, da), (b, db)]:
@@ -793,7 +893,7 @@ not transformative. The allowed decision must follow the score thresholds."""
         if duel.get("status") != "ready": raise gl.vm.UserError("[EXPECTED] Duel is not ready for resolution.")
         verdict = self._judge("duel", self._duel_task(duel["prompt_text"], duel["entry_a"], duel["entry_b"]))
         winner = verdict["winner"]; da_requested, db_requested = self._canonical_duel_deltas(winner); a = duel["player_a"]; b = duel["player_b"]
-        da = self._apply(a, da_requested, self.DUEL_WIN_MAX if winner == "A" else self.DUEL_LOSE_MAX); db = self._apply(b, db_requested, self.DUEL_WIN_MAX if winner == "B" else self.DUEL_LOSE_MAX)
+        da = self._apply(a, da_requested, self.DUEL_WIN_MAX if winner == "A" else self.DUEL_LOSE_MAX, 0, f"{duel_id}:A"); db = self._apply(b, db_requested, self.DUEL_WIN_MAX if winner == "B" else self.DUEL_LOSE_MAX, 0, f"{duel_id}:B")
         verdict["a_delta"] = da_requested; verdict["b_delta"] = db_requested; verdict["actual_a_delta"] = da; verdict["actual_b_delta"] = db
         duel["verdict"] = verdict; duel["original_verdict"] = self._clone(verdict); duel["status"] = "blocked" if winner == "NO_CONTEST" else "resolved"; duel["finalized"] = True; duel["settled_at"] = now; duel["finality_state"] = "state_finalized"; duel["challenge_eligible_until"] = now + self.CHALLENGE_WINDOW; self._write(self.duels, duel_id, duel); self._duel_profile_shift(duel, winner, 1)
         for who, delta in [(a, da), (b, db)]:
@@ -908,7 +1008,7 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         return self.ROAST_MAX, 0
 
     @gl.public.write
-    def challenge_verdict(self, result_id: str, challenge_text: str) -> None:
+    def challenge_verdict(self, result_id: str, challenge_text: str) -> str:
         addr = self._addr(); self._require_profile(addr); clean = self._text(challenge_text, "Challenge", 12, 600)
         kind, result, tournament_id, match_index = self._result_ref(result_id)
         if not kind or not result.get("finalized"): raise gl.vm.UserError("[EXPECTED] Result is not challengeable.")
@@ -929,19 +1029,21 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
             if verdict.get("decision") == "KEEP":
                 new_delta = old_delta; new_safety = current.get("safety_class", "SAFE"); new_accepted = old_accepted; actual_new = old_delta
             elif verdict.get("decision") == "BLOCK":
-                new_delta = 0; new_safety = "UNSAFE"; new_accepted = False; actual_new = self._correct_effect(result["author"], old_delta, new_delta, self._submission_limits(result.get("type", "caption"))[0], self._submission_limits(result.get("type", "caption"))[1])
+                new_delta = 0; new_safety = "UNSAFE"; new_accepted = False; actual_new = self._correct_effect(result["author"], old_delta, new_delta, self._submission_limits(result.get("type", "caption"))[0], self._submission_limits(result.get("type", "caption"))[1], result_id)
             else:
                 new_delta = int(verdict.get("new_delta", old_delta)); new_safety = verdict.get("new_safety_class", current.get("safety_class", "SAFE"))
                 new_accepted = new_safety == "SAFE" and bool(verdict.get("new_valid")) and (result.get("type") != "remix" or bool(verdict.get("new_allowed")))
                 if not new_accepted:
                     new_delta = 0
-                maximum, minimum = self._submission_limits(result.get("type", "caption")); actual_new = self._correct_effect(result["author"], old_delta, new_delta, maximum, minimum)
+                maximum, minimum = self._submission_limits(result.get("type", "caption"))
+                actual_new = old_delta if new_delta == old_delta and new_accepted == old_accepted and new_safety == current.get("safety_class", "SAFE") else self._correct_effect(result["author"], old_delta, new_delta, maximum, minimum, result_id)
             result["verdict"]["challenge_decision"] = verdict.get("decision"); result["verdict"]["safety_class"] = new_safety; result["verdict"]["actual_delta"] = actual_new; result["balance_delta"] = actual_new; result["current_accepted"] = new_accepted; result["status"] = "judged" if new_accepted else "blocked"
             source_invalidated = result.get("type") == "caption" and old_accepted and not new_accepted
             self._sync_submission_counter(result["author"], result, old_accepted, new_accepted)
             if old_accepted != new_accepted:
                 p = self._profile(result["author"]); p["safety_flags"] = max(0, int(p.get("safety_flags", 0)) + (1 if not new_accepted else -1)); self._save_profile(result["author"], p)
-            self._write(self.submissions, result_id, result); changes[result["author"]] = actual_new - old_delta; self._career_event(result["author"], "challenge_correction", result_id, actual_new - old_delta)
+            correction_change = self._correction_change(result["author"], result_id, old_delta, actual_new)
+            self._write(self.submissions, result_id, result); changes[result["author"]] = correction_change; self._career_event(result["author"], "challenge_correction", result_id, correction_change)
         else:
             old_verdict = result.get("verdict", {}); old_a = int(old_verdict.get("actual_a_delta", old_verdict.get("a_delta", 0))); old_b = int(old_verdict.get("actual_b_delta", old_verdict.get("b_delta", 0))); old_winner = old_verdict.get("winner", "NO_CONTEST")
             if verdict.get("decision") == "KEEP":
@@ -955,7 +1057,16 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
                 else:
                     cap_a, cap_b = self._competitive_reward_caps(kind, result)
                     new_a, new_b = (cap_a, cap_b) if new_winner == "A" else (cap_b, cap_a) if new_winner == "B" else (0, 0)
-            a = result.get("player_a", ""); b = result.get("player_b", ""); cap_a, cap_b = self._competitive_reward_caps(kind, result); actual_a = self._correct_effect(a, old_a, new_a, cap_a, 0); actual_b = self._correct_effect(b, old_b, new_b, cap_b, 0)
+            a = result.get("player_a", ""); b = result.get("player_b", ""); cap_a, cap_b = self._competitive_reward_caps(kind, result)
+            # KEEP is intentionally an economic no-op.  Reversing and
+            # re-applying an unchanged historical reward would make a
+            # previous-day result depend on the current day's cap and could
+            # silently erase points despite an independent KEEP decision.
+            if verdict.get("decision") == "KEEP":
+                actual_a, actual_b = old_a, old_b
+            else:
+                actual_a = old_a if new_a == old_a else self._correct_effect(a, old_a, new_a, cap_a, 0, f"{result_id}:A")
+                actual_b = old_b if new_b == old_b else self._correct_effect(b, old_b, new_b, cap_b, 0, f"{result_id}:B")
             if old_winner != new_winner:
                 if kind == "duel": self._duel_profile_shift(result, old_winner, -1); self._duel_profile_shift(result, new_winner, 1)
                 if kind == "tournament": self._tournament_profile_shift(result, old_winner, -1); self._tournament_profile_shift(result, new_winner, 1)
@@ -964,7 +1075,8 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
             if kind == "duel": self._write(self.duels, result_id, result)
             else:
                 tournament = self._read(self.tournaments, tournament_id); tournament["matches"][match_index] = result; self._write(self.tournaments, tournament_id, tournament)
-            changes[a] = actual_a - old_a; changes[b] = actual_b - old_b; self._career_event(a, "challenge_correction", result_id, actual_a - old_a); self._career_event(b, "challenge_correction", result_id, actual_b - old_b)
+            change_a = self._correction_change(a, f"{result_id}:A", old_a, actual_a); change_b = self._correction_change(b, f"{result_id}:B", old_b, actual_b)
+            changes[a] = change_a; changes[b] = change_b; self._career_event(a, "challenge_correction", result_id, change_a); self._career_event(b, "challenge_correction", result_id, change_b)
         result["challenged"] = True; result["challenge_eligible_until"] = self._now()
         if kind == "submission": self._write(self.submissions, result_id, result)
         elif kind == "duel": self._write(self.duels, result_id, result)
@@ -977,6 +1089,7 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         self.challenge_order.append(result_id); self._inc("total_challenges")
         p = self._profile(addr); p["challenge_count"] = int(p.get("challenge_count", 0)) + 1; self._save_profile(addr, p)
         self._record_history(result_id, "challenge", verdict, changes)
+        return challenge_id
 
     # -------------------------- tournaments ----------------------------
     @gl.public.write
@@ -1025,10 +1138,10 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         verdict = self._judge("duel", self._duel_task(t["prompt_text"], match["entry_a"], match["entry_b"])); winner = verdict["winner"]; reward_winner = 40 if final else 20; reward_loser = 10 if final else 5
         if winner == "A":
             requested_a, requested_b = reward_winner, reward_loser
-            da = self._apply(match["player_a"], requested_a, reward_winner); db = self._apply(match["player_b"], requested_b, reward_loser)
+            da = self._apply(match["player_a"], requested_a, reward_winner, 0, f"{match['id']}:A"); db = self._apply(match["player_b"], requested_b, reward_loser, 0, f"{match['id']}:B")
         elif winner == "B":
             requested_a, requested_b = reward_loser, reward_winner
-            da = self._apply(match["player_a"], requested_a, reward_loser); db = self._apply(match["player_b"], requested_b, reward_winner)
+            da = self._apply(match["player_a"], requested_a, reward_loser, 0, f"{match['id']}:A"); db = self._apply(match["player_b"], requested_b, reward_winner, 0, f"{match['id']}:B")
         else:
             requested_a, requested_b = 0, 0
             da, db = 0, 0

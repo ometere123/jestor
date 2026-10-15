@@ -13,7 +13,7 @@ jobs:
   static-and-direct:
     name: Static, build, lint, Direct Mode
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +32,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Install pinned GenVM tooling
         run: python -m pip install --disable-pip-version-check genvm-linter==0.11.0 genlayer-test==0.29.2
 
@@ -40,6 +43,9 @@ jobs:
 
       - name: Frontend protocol unit tests
         run: npm run test:frontend:unit
+
+      - name: Frontend browser smoke tests
+        run: npm run test:e2e -- tests/e2e/ui.spec.ts
 
       - name: ESLint
         run: npm run lint

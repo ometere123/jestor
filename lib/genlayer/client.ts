@@ -160,6 +160,54 @@ export async function verifyFinalizedTransaction(resultId: string, hash: string)
   }
 }
 
+/**
+ * Verify the write that settled a verdict challenge.  A challenge has no
+ * standalone receipt type, so the proof is the conjunction of a finalized
+ * successful majority-agree receipt, the configured contract target, the
+ * challenge id returned by that receipt, and finalized state showing the same
+ * challenge record.  A user supplied hash alone is never evidence.
+ */
+export async function verifyFinalizedChallengeTransaction(resultId: string, hash: string): Promise<VerifiedTransaction> {
+  if (USE_MOCK) return { verified: false, hash, reason: "Mock mode has no authoritative receipt." };
+  const address = getContractAddress();
+  if (!address || !/^0x[0-9a-fA-F]{64}$/.test(hash)) {
+    return { verified: false, hash, reason: "A valid transaction hash and configured contract are required." };
+  }
+  const client = getReadClient();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const receipt = await (client.waitForTransactionReceipt as any)({
+      hash,
+      status: "FINALIZED",
+      retries: 2,
+      interval: 1500,
+    });
+    const evidence = receiptEvidence(receipt);
+    if (evidence.finality !== "finalized" || evidence.resultName !== "MAJORITY_AGREE" || evidence.executionResult !== "SUCCESS") {
+      return { verified: false, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, reason: "Receipt is not a finalized successful majority-agree contract execution." };
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const transaction: any = await (client.getTransaction as any)({ hash });
+    const target = transaction?.to ?? transaction?.to_address ?? transaction?.contract_address ?? transaction?.contractAddress ?? transaction?.target;
+    if (!target || !sameAddress(target, address)) {
+      return { verified: false, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, reason: "Receipt targets a different contract." };
+    }
+    const returned = extractReturnValueFromReceipt(receipt);
+    const challengeId = typeof returned === "string" ? returned : undefined;
+    if (!challengeId) {
+      return { verified: false, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, reason: "The finalized challenge receipt did not return a challenge identifier." };
+    }
+    const state = await client.readContract({ address, functionName: "get_verdict", args: [resultId], transactionHashVariant: TransactionHashVariant.LATEST_FINAL }) as Record<string, unknown>;
+    const challenge = state?.challenge as Record<string, unknown> | undefined;
+    if (!state || state.finalized !== true || state.challenged !== true || !challenge || challenge.result_id !== resultId || challenge.id !== challengeId || challenge.settled !== true) {
+      return { verified: false, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, reason: "Finalized state does not prove this receipt settled the requested challenge." };
+    }
+    return { verified: true, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, resultId };
+  } catch (error) {
+    return { verified: false, hash, reason: error instanceof Error ? error.message : "Challenge receipt verification failed." };
+  }
+}
+
 function repairLooseJson(raw: string): string {
   return raw.trim().replace(/,\s*([}\]])/g, "$1");
 }
