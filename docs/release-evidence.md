@@ -40,8 +40,8 @@ The release candidate passed:
 - `git diff --check`: passed for the release changes.
 
 GitHub Actions run
-[`38789135998`](https://github.com/ometere123/jestor/actions/runs/38789135998)
-passed the static/build/lint/Direct Mode job on commit `fa95969`. Its
+[`38789504493`](https://github.com/ometere123/jestor/actions/runs/38789504493)
+passed the static/build/lint/Direct Mode job on commit `a81187c`. Its
 secret-dependent Studionet job was intentionally skipped because repository
 secrets are not configured; the live evidence below was executed locally with
 five funded CLI-managed wallets, with the fifth used only as a non-participant
@@ -256,15 +256,16 @@ Production and Preview configuration were updated through the Vercel CLI to
 the contract above with chain `61999`, RPC
 `https://studio.genlayer.com/api`, and
 `NEXT_PUBLIC_USE_MOCK_CONTRACT=false`. The final production deployment is
-`dpl_G42MWzZSa6EMD6z6JXrUKhQk1AAH` (`READY`), inspect URL
-`https://vercel.com/delealufejoel-4184s-projects/jestor/G42MWzZSa6EMD6z6JXrUKhQk1AAH`,
-and production alias `https://jestor.vercel.app`. An HTTP smoke returned 200;
-the served JavaScript contained the final contract address, Studionet RPC,
-chain `61999`, and injected `window.ethereum` wallet logic. The homepage,
-duels, circuit, and public verdict routes rendered in the in-app browser. The
-Chrome extension provider was unavailable in this audit session, so no browser
-transaction was claimed as evidence; the five-wallet CLI runs below are the
-authoritative live write/readback evidence.
+`dpl_F29HX8jTtT6sg4G7fYoDMJew4wut` (`READY`), inspect URL
+`https://vercel.com/delealufejoel-4184s-projects/jestor/F29HX8jTtT6sg4G7fYoDMJew4wut`,
+and production alias `https://jestor.vercel.app`. HTTP smoke checks returned
+200 for the homepage and a public verdict route; 14 served JavaScript bundles
+contained the final contract address, Studionet RPC, chain `61999`, and
+injected `window.ethereum` wallet logic. The homepage, duels, circuit, and
+public verdict routes rendered in the in-app browser. The Chrome extension
+provider was unavailable in this audit session, so no browser transaction was
+claimed as evidence; the five-wallet CLI runs below are the authoritative live
+write/readback evidence.
 
 ## Historical state and limitations
 
