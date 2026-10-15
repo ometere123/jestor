@@ -40,8 +40,8 @@ The release candidate passed:
 - `git diff --check`: passed for the release changes.
 
 GitHub Actions run
-[`38773859807`](https://github.com/ometere123/jestor/actions/runs/38773859807)
-passed the static/build/lint/Direct Mode job on commit `ae90125`. Its
+[`38789135998`](https://github.com/ometere123/jestor/actions/runs/38789135998)
+passed the static/build/lint/Direct Mode job on commit `fa95969`. Its
 secret-dependent Studionet job was intentionally skipped because repository
 secrets are not configured; the live evidence below was executed locally with
 five funded CLI-managed wallets, with the fifth used only as a non-participant
