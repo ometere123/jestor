@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:frontend:unit": "vitest run tests/frontend --environment node",
     "test:direct": "python -m pytest tests/direct -q",
-    "test:frontend": "npm run lint && npx tsc --noEmit --pretty false && npm run build"
+    "test:frontend": "npm run test:frontend:unit && npm run lint && npx tsc --noEmit --pretty false && npm run build"
   },
   "dependencies": {
     "clsx": "^2.1.1",

@@ -38,6 +38,9 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit --pretty false
 
+      - name: Frontend protocol unit tests
+        run: npm run test:frontend:unit
+
       - name: ESLint
         run: npm run lint
 

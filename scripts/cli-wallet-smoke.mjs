@@ -180,43 +180,105 @@ export async function runSmoke() {
   }
   if (!prompt?.id || prompt.moderation !== "APPROVED" || prompt.active !== true) throw new Error("Prompt approval/readback failed after bounded retries or override validation.");
   await write(names[0], "submit_caption", ["not-a-prompt", "This invalid prompt must be rejected."], { expectError: true });
-  const captionText = "The moon goose filed the punchline before the teacup referee could object.";
-  await write(names[0], "submit_caption", [prompt.id, captionText]);
-  const recent = await read("get_recent_submissions", [prompt.id, 30]);
-  const caption = recent.find((item) => item?.text === captionText);
-  if (!caption?.id || !caption.finalized) throw new Error("Caption readback failed.");
-  await write(names[1], "submit_roast_self", [prompt.id, "My debugging strategy is to rename the bug and call it architecture."]);
-  const roastId = await read("get_latest_submission_id", [addresses[1]]);
-  await write(names[3], "challenge_verdict", [roastId, "Reassess the roast safety, outcome, and deterministic point effect."]);
+  let caption;
+  if (process.env.GL_CAPTION_ID) {
+    caption = await read("get_verdict", [process.env.GL_CAPTION_ID]);
+    if (!caption?.id || caption.type !== "caption" || caption.prompt_id !== prompt.id || !caption.finalized || !caption.current_accepted) {
+      throw new Error("Caption override is not an accepted finalized caption for the selected prompt.");
+    }
+    console.log(`PASS reuse accepted finalized caption ${caption.id}`);
+  } else {
+    const captionText = process.env.GL_CAPTION_TEXT ?? "The punchline waited for validator quorum, filed an appeal, and still got rejected for insufficient gas; the goose called that a career milestone.";
+    await write(names[0], "submit_caption", [prompt.id, captionText]);
+    const recent = await read("get_recent_submissions", [prompt.id, 30]);
+    caption = recent.find((item) => item?.text === captionText);
+    if (!caption?.id || !caption.finalized) throw new Error("Caption readback failed.");
+  }
+  let roastId;
+  let roastAlreadyChallenged = false;
+  if (process.env.GL_ROAST_ID) {
+    const existingRoast = await read("get_verdict", [process.env.GL_ROAST_ID]);
+    if (!existingRoast?.id || existingRoast.type !== "roast" || existingRoast.prompt_id !== prompt.id || !existingRoast.finalized || !existingRoast.current_accepted) {
+      throw new Error("Roast override is not an accepted finalized roast for the selected prompt.");
+    }
+    roastId = existingRoast.id;
+    roastAlreadyChallenged = Boolean(existingRoast.challenged);
+    console.log(`PASS reuse accepted finalized roast ${roastId}`);
+  } else {
+    const roastText = process.env.GL_ROAST_TEXT ?? "My debugging strategy is to rename the bug and call it architecture.";
+    await write(names[1], "submit_roast_self", [prompt.id, roastText]);
+    roastId = await read("get_latest_submission_id", [addresses[1]]);
+  }
+  if (!roastAlreadyChallenged) await write(names[3], "challenge_verdict", [roastId, "Reassess the roast safety, outcome, and deterministic point effect."]);
+  else console.log(`PASS reuse settled challenge for ${roastId}`);
   const challenged = await read("get_verdict", [roastId]);
   if (!challenged?.challenged) throw new Error("Challenge correction was not settled.");
-  await write(names[2], "invoke_chaos_action", [prompt.id, "A harmless confetti storm celebrates a joke that survived review."]);
-  await write(names[2], "submit_remix", [prompt.id, caption.id, "The goose became chief auditor, and the teacup appealed the joke to filing cabinets."]);
-  await write(names[2], "submit_remix", [prompt.id, caption.id, captionText], { expectError: true });
+  if (process.env.GL_CHAOS_ID) {
+    const existingChaos = await read("get_verdict", [process.env.GL_CHAOS_ID]);
+    if (!existingChaos?.id || existingChaos.type !== "chaos" || existingChaos.prompt_id !== prompt.id || !existingChaos.finalized) {
+      throw new Error("Chaos override is not a finalized chaos result for the selected prompt.");
+    }
+    console.log(`PASS reuse finalized chaos ${existingChaos.id}`);
+  } else {
+    await write(names[2], "invoke_chaos_action", [prompt.id, "A harmless confetti storm celebrates a joke that survived review."]);
+  }
+  let remixId;
+  if (process.env.GL_REMIX_ID) {
+    const existingRemix = await read("get_verdict", [process.env.GL_REMIX_ID]);
+    if (!existingRemix?.id || existingRemix.type !== "remix" || existingRemix.prompt_id !== prompt.id || existingRemix.source_id !== caption.id || !existingRemix.finalized || !existingRemix.current_accepted) {
+      throw new Error("Remix override is not an accepted finalized remix for the selected caption.");
+    }
+    remixId = existingRemix.id;
+    console.log(`PASS reuse accepted finalized remix ${remixId}`);
+  } else {
+    const remixText = process.env.GL_REMIX_TEXT ?? "The moon goose became a theatrical lawyer, while the teacup referee turned the punchline into a filing-cabinet opera with a crown-wearing chorus.";
+    await write(names[2], "submit_remix", [prompt.id, caption.id, remixText]);
+    remixId = await read("get_latest_submission_id", [addresses[2]]);
+  }
+  await write(names[2], "submit_remix", [prompt.id, caption.id, caption.text], { expectError: true });
 
-  const entryA = "The validator asked the block for a punchline and received a pending receipt.";
-  const entryB = "The block replied that its jokes were still waiting for quorum.";
-  const saltA = randomBytes(18).toString("hex");
-  const saltB = randomBytes(18).toString("hex");
-  const nonce = randomBytes(18).toString("hex");
-  const duel = duelId(prompt.id, addresses[0], nonce);
-  await write(names[0], "start_duel", [prompt.id, commitment(duel, prompt.id, addresses[0], entryA, saltA), nonce]);
-  await write(names[0], "reveal_duel_entry", [duel, entryA, saltA], { expectError: true });
-  await write(names[1], "join_duel", [duel, commitment(duel, prompt.id, addresses[1], entryB, saltB)]);
-  const hidden = await read("get_duel", [duel]);
-  if (hidden.entry_a || hidden.entry_b) throw new Error("Duel entries exposed before reveals.");
-  await write(names[0], "reveal_duel_entry", [duel, entryA, saltA]);
-  await write(names[1], "reveal_duel_entry", [duel, entryB, saltB]);
-  await write(names[2], "resolve_duel", [duel]);
-  const resolved = await read("get_duel", [duel]);
-  if (!resolved.finalized || !resolved.entry_a || !resolved.entry_b) throw new Error("Duel did not settle.");
+  let duel;
+  if (process.env.GL_DUEL_ID) {
+    duel = process.env.GL_DUEL_ID;
+    const existingDuel = await read("get_duel", [duel]);
+    if (!existingDuel?.id || existingDuel.prompt_id !== prompt.id || !existingDuel.finalized || existingDuel.status !== "resolved" || !existingDuel.entry_a || !existingDuel.entry_b || !existingDuel.original_verdict || !existingDuel.verdict) {
+      throw new Error("Duel override is not a finalized resolved duel for the selected prompt.");
+    }
+    console.log(`PASS reuse finalized resolved duel ${duel}`);
+  } else {
+    const entryA = "The validator asked the block for a punchline and received a pending receipt.";
+    const entryB = "The block replied that its jokes were still waiting for quorum.";
+    const saltA = randomBytes(18).toString("hex");
+    const saltB = randomBytes(18).toString("hex");
+    const nonce = randomBytes(18).toString("hex");
+    duel = duelId(prompt.id, addresses[0], nonce);
+    await write(names[0], "start_duel", [prompt.id, commitment(duel, prompt.id, addresses[0], entryA, saltA), nonce]);
+    await write(names[0], "reveal_duel_entry", [duel, entryA, saltA], { expectError: true });
+    await write(names[1], "join_duel", [duel, commitment(duel, prompt.id, addresses[1], entryB, saltB)]);
+    const hidden = await read("get_duel", [duel]);
+    if (hidden.entry_a || hidden.entry_b) throw new Error("Duel entries exposed before reveals.");
+    await write(names[0], "reveal_duel_entry", [duel, entryA, saltA]);
+    await write(names[1], "reveal_duel_entry", [duel, entryB, saltB]);
+    await write(names[2], "resolve_duel", [duel]);
+    const resolved = await read("get_duel", [duel]);
+    if (!resolved.finalized || !resolved.entry_a || !resolved.entry_b) throw new Error("Duel did not settle.");
+  }
 
-  const startsAt = Math.floor(Date.now() / 1000) + 75;
+  // Consensus latency can exceed the nominal registration lead; leave a
+  // bounded margin so a valid scheduled tournament is not rejected merely
+  // because create_tournament finalized near the deadline.
+  const startsAt = Math.floor(Date.now() / 1000) + 300;
   await write(names[0], "create_tournament", [prompt.id, String(startsAt)]);
   const open = await read("get_open_tournaments");
   const tournament = open.find((item) => item?.starts_at === startsAt) ?? open[0];
   if (!tournament?.id) throw new Error("Tournament was not indexed.");
-  for (let index = 0; index < 4; index += 1) await write(names[index], "join_tournament", [tournament.id, `Circuit entry ${index + 1} with a distinct moon-goose filing joke ${tag}`]);
+  const circuitEntries = [
+    "The librarian turns a moon-goose parade into a precise comedy appeal, complete with a teacup referee who stamps every punchline guilty of fowl play.",
+    "I like jokes.",
+    "A moon goose cross-examines the teacup referee, files the punchline under absurd jurisprudence, and wins applause from the entire library parade.",
+    "I am a potato.",
+  ];
+  for (let index = 0; index < 4; index += 1) await write(names[index], "join_tournament", [tournament.id, `${circuitEntries[index]} ${tag}`]);
   await waitUntil(startsAt + 2, "scheduled tournament start");
   await write(names[3], "settle_tournament_match", [tournament.id, "0"]);
   await write(names[3], "settle_tournament_match", [tournament.id, "1"]);

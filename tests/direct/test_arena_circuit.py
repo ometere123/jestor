@@ -206,6 +206,12 @@ def test_independent_agreement_rejects_malicious_threshold_and_decision_changes(
     assert arena._valid("caption", advisory_reward_a) is True
     assert arena._agree("caption", advisory_reward_a, advisory_reward_b) is True
 
+    remix_advisory_a = {"allowed": False, "safety_class": "SAFE", "transformative_score": 80, "humor_score": 80, "prompt_fit": 80, "balance_delta": 0, "reason": "The model echo is advisory."}
+    remix_advisory_b = dict(remix_advisory_a, allowed=True)
+    assert arena._valid("remix", remix_advisory_a) is True
+    assert arena._valid("remix", remix_advisory_b) is True
+    assert arena._agree("remix", remix_advisory_a, remix_advisory_b) is True
+
 
 def test_malformed_judgments_are_rejected_without_numeric_coercion(direct_vm, direct_deploy, direct_alice):
     arena = direct_deploy(CONTRACT)

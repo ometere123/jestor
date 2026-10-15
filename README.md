@@ -17,6 +17,9 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | RPC | `https://studio.genlayer.com/api` |
 | CLI | repository-local `genlayer@0.39.1` |
 | GenVM linter | `genvm-linter==0.11.0` |
+| Verified Arena Circuit contract | `0x619da6669ab735a0a12EaCFaA3623Ce39ec035A2` |
+| Deployment transaction | `0xbcab72ffe995331bff52fd2ec2e35b7746f92887908c5de2148b9d13b5b6133c` |
+| Verified source SHA-256 | `011a53ebd0c62bdc1bc639d62d2439c0fae1c3769bc66e2cfc1fb67301c4eaf3` |
 | Production frontend | [jestor.vercel.app](https://jestor.vercel.app) |
 
 The release is one cohesive state machine in
@@ -159,6 +162,7 @@ adapter is only for isolated frontend development and is never chain evidence.
 
 ```powershell
 npm ci
+npm run test:frontend:unit
 npx tsc --noEmit --pretty false
 npm run lint
 npm run build

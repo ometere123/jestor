@@ -174,13 +174,21 @@ export async function runSmoke() {
   const resolvedDuel = await read(players[0], "get_duel", [duel]);
   if (resolvedDuel.status !== "resolved" || !resolvedDuel.finalized || !resolvedDuel.entry_a || !resolvedDuel.entry_b) throw new Error("Duel did not settle after valid reveals.");
 
-  const startsAt = Math.floor(Date.now() / 1000) + 75;
+  // Leave a bounded margin for consensus finalization before registration
+  // closes; the contract still enforces its own 1-minute minimum lead.
+  const startsAt = Math.floor(Date.now() / 1000) + 300;
   await write(players[0], "create_tournament", [prompt.id, startsAt]);
   const open = await read(players[0], "get_open_tournaments", []);
   const tournament = open.find((item) => item?.starts_at === startsAt) ?? open[0];
   if (!tournament?.id) throw new Error("Tournament is not discoverable after finalization.");
+  const circuitEntries = [
+    "The librarian turns a moon-goose parade into a precise comedy appeal, complete with a teacup referee who stamps every punchline guilty of fowl play.",
+    "I like jokes.",
+    "A moon goose cross-examines the teacup referee, files the punchline under absurd jurisprudence, and wins applause from the entire library parade.",
+    "I am a potato.",
+  ];
   for (let index = 0; index < 4; index += 1) {
-    await write(players[index], "join_tournament", [tournament.id, "Circuit entry " + (index + 1) + " with a distinct moon-goose filing joke " + tag]);
+    await write(players[index], "join_tournament", [tournament.id, circuitEntries[index] + " " + tag]);
   }
   const registered = await read(players[0], "get_tournament", [tournament.id]);
   if (registered.players?.length !== 4 || registered.stage !== "registration") throw new Error("Tournament registration is not exactly four players.");
