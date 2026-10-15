@@ -362,6 +362,49 @@ def test_draw_blocks_tournament_and_never_advances_player_a(direct_vm, direct_de
     assert updated.get("champion") is None
 
 
+def test_closed_semifinal_windows_materialize_final_before_settlement(direct_vm, direct_deploy, direct_accounts):
+    arena = direct_deploy(CONTRACT)
+    accounts = direct_accounts[:4]
+    create_profiles(arena, direct_vm, accounts)
+    prompt_id = create_prompt(arena, direct_vm, accounts[0], "A circuit bracket must advance only after fair challenge windows close.")
+    direct_vm.sender = accounts[0]
+    tournament_id = arena.create_tournament(prompt_id, int(time.time()) + 120)
+    tournament = json.loads(arena.tournaments[tournament_id])
+    tournament["players"] = [{"address": address(account), "entry": f"entry {index}"} for index, account in enumerate(accounts)]
+    tournament["stage"] = "semifinals"
+    tournament["status"] = "active"
+    tournament["matches"] = []
+    for index, (player_a, player_b) in enumerate([(accounts[0], accounts[1]), (accounts[2], accounts[3])]):
+        match_id = f"{tournament_id}:{index}"
+        match = {
+            "id": match_id,
+            "index": index,
+            "player_a": address(player_a),
+            "entry_a": f"strong entry {index}",
+            "player_b": address(player_b),
+            "entry_b": f"weak entry {index}",
+            "status": "resolved",
+            "verdict": {"winner": "A", "a_delta": 20, "b_delta": 5, "actual_a_delta": 20, "actual_b_delta": 5, "safety_class": "SAFE"},
+            "original_verdict": {"winner": "A", "a_delta": 20, "b_delta": 5, "actual_a_delta": 20, "actual_b_delta": 5, "safety_class": "SAFE"},
+            "settled": True,
+            "finalized": True,
+            "challenged": False,
+            "challenge_eligible_until": 0,
+        }
+        tournament["matches"].append(match)
+        arena.tournament_match_index[match_id] = f"{tournament_id}|{index}"
+    arena.tournaments[tournament_id] = json.dumps(tournament)
+    mock_duel(direct_vm, "A")
+    direct_vm.sender = accounts[3]
+    arena.settle_tournament_match(tournament_id, 2)
+    updated = arena.get_tournament(tournament_id)
+    assert updated["stage"] == "final"
+    assert len(updated["matches"]) == 3
+    assert updated["matches"][2]["status"] == "resolved"
+    assert updated["matches"][2]["verdict"]["winner"] == "A"
+    assert updated["finalized"] is False
+
+
 def test_challenge_reopens_tournament_match_before_finalization(direct_vm, direct_deploy, direct_accounts):
     arena = direct_deploy(CONTRACT)
     players = direct_accounts[:4]

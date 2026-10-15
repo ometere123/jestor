@@ -1100,6 +1100,12 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
             self._recover_tournament(t); self._write(self.tournaments, tournament_id, t); return tournament_id
         self._start_tournament(t)
         if t.get("status") != "active": self._write(self.tournaments, tournament_id, t); return tournament_id
+        # A permissionless call after a closed challenge window must be able
+        # to materialize the final before validating match_index=2. Without
+        # this advance, a settled semifinal bracket could deadlock forever.
+        self._advance_tournament(t)
+        if t.get("finalized"):
+            self._write(self.tournaments, tournament_id, t); return tournament_id
         matches = t.get("matches", [])
         if match_index < 0 or match_index >= len(matches): raise gl.vm.UserError("[EXPECTED] Invalid match index.")
         match = matches[match_index]; final = t.get("stage") == "final" and match_index == 2
@@ -1107,6 +1113,19 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         if t.get("stage") == "semifinals" and match_index > 1: raise gl.vm.UserError("[EXPECTED] Semifinals must settle first.")
         if t.get("stage") == "final" and not final: raise gl.vm.UserError("[EXPECTED] Final is not ready.")
         self._tournament_match(t, match, final); matches[match_index] = match; t["matches"] = matches; self._advance_tournament(t); self._write(self.tournaments, tournament_id, t); return tournament_id
+
+    @gl.public.write
+    def advance_tournament(self, tournament_id: str) -> str:
+        """Persist bracket progression after a challenge window closes."""
+        if tournament_id not in self.tournaments: raise gl.vm.UserError("[EXPECTED] Tournament not found.")
+        t = self._read(self.tournaments, tournament_id)
+        if t.get("finalized"): return tournament_id
+        if self._now() > int(t.get("deadline", 0)):
+            self._recover_tournament(t)
+        else:
+            self._start_tournament(t); self._advance_tournament(t)
+        self._write(self.tournaments, tournament_id, t)
+        return tournament_id
 
     def _recover_tournament(self, t: dict) -> None:
         if t.get("finalized"): return

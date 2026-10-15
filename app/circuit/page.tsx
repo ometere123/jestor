@@ -5,7 +5,7 @@ import ArenaShell from "@/components/layout/ArenaShell";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { createTournament, finalizeTournament, getActivePrompts, getOpenTournaments, joinTournament, recoverTournament, settleTournamentMatch } from "@/lib/genlayer/contract";
+import { advanceTournament, createTournament, finalizeTournament, getActivePrompts, getOpenTournaments, joinTournament, recoverTournament, settleTournamentMatch } from "@/lib/genlayer/contract";
 import type { Prompt, Tournament } from "@/lib/genlayer/types";
 
 export default function CircuitPage() {
@@ -38,6 +38,12 @@ export default function CircuitPage() {
     try { await settleTournamentMatch(address, id, index); await refresh(); setStatus("Round transaction finalized. Challenge windows may still block progression."); }
     catch (e: unknown) { setStatus(e instanceof Error ? e.message : "Round is not ready."); }
   };
+  const advance = async (id: string) => {
+    if (!address) return;
+    setStatus("Advancing only after settled challenge windows close...");
+    try { await advanceTournament(address, id); await refresh(); setStatus("Bracket progression finalized."); }
+    catch (e: unknown) { setStatus(e instanceof Error ? e.message : "Bracket is not ready to advance."); }
+  };
   const finalize = async (id: string) => {
     if (!address) return;
     setStatus("Finalizing only after all settled verdict challenge windows close...");
@@ -61,7 +67,7 @@ export default function CircuitPage() {
         <p className="font-bold">{t.prompt_text}</p><p className="text-xs font-mono">{t.players.length}/4 registered · season {t.season}</p>
         <Button size="sm" onClick={() => join(t.id)} disabled={!entry.trim() || !address || t.players.length >= 4 || t.status !== "open"} variant="blue">Join</Button>
         <div className="flex flex-wrap gap-2">{t.matches.map((match, index) => <Button key={String(match.id ?? index)} size="sm" onClick={() => settle(t.id, index)} disabled={match.status !== "pending"} variant="green">Settle {index < 2 ? "semifinal" : "final"}</Button>)}</div>
-        <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => finalize(t.id)} disabled={!address || t.status !== "active"} variant="primary">Finalize settled circuit</Button><Button size="sm" onClick={() => recover(t.id)} disabled={!address || t.finalized} variant="danger">Recover after expiry</Button></div>
+        <div className="flex flex-wrap gap-2"><Button size="sm" onClick={() => advance(t.id)} disabled={!address || t.finalized} variant="blue">Advance bracket</Button><Button size="sm" onClick={() => finalize(t.id)} disabled={!address || t.status !== "active"} variant="primary">Finalize settled circuit</Button><Button size="sm" onClick={() => recover(t.id)} disabled={!address || t.finalized} variant="danger">Recover after expiry</Button></div>
         {t.champion && <p className="text-sm font-black text-[#35E36D]">Champion: {t.champion}</p>}
         <pre className="text-[10px] font-mono whitespace-pre-wrap text-[#6B6257]">{t.matches.map((m, i) => "round " + (i + 1) + ": " + String(m.status) + (m.verdict && typeof m.verdict === "object" ? " · " + String((m.verdict as { winner?: unknown }).winner ?? "") : "")).join("\n")}</pre>
       </div>)}

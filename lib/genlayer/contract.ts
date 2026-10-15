@@ -108,6 +108,7 @@ export async function challengeVerdict(sender: string, resultId: string, text: s
 export async function createTournament(sender: string, promptId: string, startsAt: number) { return callWrite(sender, "create_tournament", [promptId, startsAt]); }
 export async function joinTournament(sender: string, tournamentId: string, entry: string) { return callWrite(sender, "join_tournament", [tournamentId, entry]); }
 export async function settleTournamentMatch(sender: string, tournamentId: string, matchIndex: number) { return callWrite(sender, "settle_tournament_match", [tournamentId, matchIndex]); }
+export async function advanceTournament(sender: string, tournamentId: string) { return callWrite(sender, "advance_tournament", [tournamentId]); }
 export async function finalizeTournament(sender: string, tournamentId: string) { return callWrite(sender, "finalize_tournament", [tournamentId]); }
 export async function recoverTournament(sender: string, tournamentId: string) { return callWrite(sender, "recover_tournament", [tournamentId]); }
 

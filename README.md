@@ -131,6 +131,7 @@ and a correction cannot re-open or re-settle the result.
 | `create_tournament(prompt_id, starts_at)` | Schedule a circuit |
 | `join_tournament(tournament_id, entry)` | Register one player |
 | `settle_tournament_match(tournament_id, match_index)` | Settle a match |
+| `advance_tournament(tournament_id)` | Materialize the next bracket stage after challenge windows |
 | `finalize_tournament(tournament_id)` | Finalize after all gates |
 | `recover_tournament(tournament_id)` | Permissionless expiry recovery |
 | `get_verdict(result_id)` / `get_verdict_history(...)` | Public evidence |
