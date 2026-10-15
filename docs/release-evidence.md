@@ -50,6 +50,12 @@ secrets are not configured; the live evidence below was executed locally with
 five funded CLI-managed wallets, with the fifth used only as a non-participant
 challenger.
 
+After the branch was fast-forwarded into `master`, the final master-head run
+[`38823638629`](https://github.com/ometere123/jestor/actions/runs/38823638629)
+also passed the complete static/build/lint/Direct Mode job on commit
+`7cce402`; its secret-dependent live job was skipped for the same explicit
+missing-secrets reason.
+
 The direct suite covers deterministic invariants and adversarial leader
 outputs. Direct Mode does not itself prove validator agreement; that evidence
 comes from the finalized Studionet receipts below.
