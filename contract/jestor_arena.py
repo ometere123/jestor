@@ -309,13 +309,13 @@ class JestoraArena(gl.Contract):
             if not self._safety(data.get("safety_class")) or not self._bounded_int(data, "prompt_fit", 0, 100) or not self._bounded_int(data, "humor_score", 0, 100) or not self._bounded_int(data, "originality_score", 0, 100) or not self._bounded_int(data, "balance_delta", 0, self.CAPTION_MAX):
                 return False
             outcome = self._canonical_caption_outcome(data["humor_score"], data["originality_score"]) if safe else "BLOCKED"
-            return data.get("outcome") in {"TRY_AGAIN", "SMALL_LAUGH", "CLEAN_HIT", "ABSURD_GENIUS", "TOO_DERIVATIVE", "BLOCKED"} and data.get("outcome") == outcome and data.get("balance_delta") == (self._canonical_caption_delta(data["prompt_fit"], data["humor_score"], data["originality_score"]) if safe else 0)
+            return data.get("outcome") in {"TRY_AGAIN", "SMALL_LAUGH", "CLEAN_HIT", "ABSURD_GENIUS", "TOO_DERIVATIVE", "BLOCKED"} and data.get("outcome") == outcome and (safe or data.get("balance_delta") == 0)
         if kind == "roast":
             safe = data.get("safety_class") == "SAFE"
             if data.get("safety_class") not in {"SAFE", "TOO_MEAN", "UNSAFE", "TARGETED_ABUSE", "HATE", "SELF_HARM"} or not self._bounded_int(data, "playfulness_score", 0, 100) or not self._bounded_int(data, "humor_score", 0, 100) or not self._bounded_int(data, "balance_delta", 0, self.ROAST_MAX):
                 return False
             outcome = self._canonical_roast_outcome(data["playfulness_score"]) if safe else "BLOCKED"
-            return data.get("outcome") in {"HUMBLE_PIE", "BRUTAL_BUT_SAFE", "TRY_AGAIN", "BLOCKED"} and data.get("outcome") == outcome and data.get("balance_delta") == (self._canonical_roast_delta(data["playfulness_score"], data["humor_score"]) if safe else 0)
+            return data.get("outcome") in {"HUMBLE_PIE", "BRUTAL_BUT_SAFE", "TRY_AGAIN", "BLOCKED"} and data.get("outcome") == outcome and (safe or data.get("balance_delta") == 0)
         if kind == "duel":
             if not self._bounded_int(data, "entry_a_score", 0, 100) or not self._bounded_int(data, "entry_b_score", 0, 100) or not self._bounded_int(data, "a_delta", 0, self.DUEL_WIN_MAX) or not self._bounded_int(data, "b_delta", 0, self.DUEL_WIN_MAX):
                 return False
@@ -323,24 +323,25 @@ class JestoraArena(gl.Contract):
             score_b = data["entry_b_score"]
             safe = data.get("safety_class") == "SAFE"
             winner = self._canonical_winner(score_a, score_b) if safe else "NO_CONTEST"
-            da, db = self._canonical_duel_deltas(winner)
             return (
                 data.get("winner") == winner
-                and data.get("a_delta") == da and data.get("b_delta") == db
+                and (safe or (data.get("a_delta") == 0 and data.get("b_delta") == 0))
                 and data.get("safety_class") in {"SAFE", "UNSAFE"}
             )
         if kind == "chaos":
             valid = isinstance(data.get("valid"), bool)
             sane = data.get("chaos_class") in {"BLESSING", "CURSE", "MIRROR", "CONFETTI", "NULL_EVENT"}
+            if not self._bounded_int(data, "balance_delta", self.CHAOS_MIN, self.CHAOS_MAX):
+                return False
             if not valid:
                 return sane and data.get("chaos_class") == "NULL_EVENT" and data.get("balance_delta") == 0 and isinstance(data.get("title"), str) and len(data["title"].strip()) <= 80 and isinstance(data.get("flavor_text"), str) and len(data["flavor_text"].strip()) <= 240
-            return sane and data.get("chaos_class") != "NULL_EVENT" and data.get("balance_delta") == self._canonical_chaos_delta(True, data.get("chaos_class")) and isinstance(data.get("title"), str) and len(data["title"].strip()) <= 80 and isinstance(data.get("flavor_text"), str) and len(data["flavor_text"].strip()) <= 240
+            return sane and data.get("chaos_class") != "NULL_EVENT" and isinstance(data.get("title"), str) and len(data["title"].strip()) <= 80 and isinstance(data.get("flavor_text"), str) and len(data["flavor_text"].strip()) <= 240
         if kind == "remix":
             safe = data.get("safety_class") == "SAFE"
             if not isinstance(data.get("allowed"), bool) or not self._safety(data.get("safety_class")) or not self._bounded_int(data, "transformative_score", 0, 100) or not self._bounded_int(data, "humor_score", 0, 100) or not self._bounded_int(data, "prompt_fit", 0, 100) or not self._bounded_int(data, "balance_delta", 0, self.REMIX_MAX):
                 return False
             allowed = self._canonical_remix_allowed(data["transformative_score"], data["humor_score"], data["prompt_fit"]) if safe else False
-            return data.get("allowed") == allowed and data.get("balance_delta") == (self._canonical_remix_delta(data["transformative_score"], data["humor_score"], data["prompt_fit"]) if allowed else 0)
+            return data.get("allowed") == allowed and (safe or data.get("balance_delta") == 0)
         if kind == "challenge":
             shape_ok = (
                 data.get("result_kind") in {"submission", "duel", "tournament"}
@@ -380,15 +381,15 @@ class JestoraArena(gl.Contract):
         if kind == "prompt":
             return a.get("allowed") == b.get("allowed") and a.get("safety_class") == b.get("safety_class") and a.get("duplicate") == b.get("duplicate") and abs(a["originality_score"] - b["originality_score"]) <= 15
         if kind == "caption":
-            return a.get("safety_class") == b.get("safety_class") and a.get("outcome") == b.get("outcome") and abs(a["prompt_fit"] - b["prompt_fit"]) <= 20 and abs(a["humor_score"] - b["humor_score"]) <= 20 and abs(a["originality_score"] - b["originality_score"]) <= 20 and abs(self._canonical_caption_delta(a["prompt_fit"], a["humor_score"], a["originality_score"]) - self._canonical_caption_delta(b["prompt_fit"], b["humor_score"], b["originality_score"])) <= 10
+            return a.get("safety_class") == b.get("safety_class") and a.get("outcome") == b.get("outcome") and abs(a["prompt_fit"] - b["prompt_fit"]) <= 20 and abs(a["humor_score"] - b["humor_score"]) <= 20 and abs(a["originality_score"] - b["originality_score"]) <= 20
         if kind == "roast":
-            return a.get("safety_class") == b.get("safety_class") and a.get("outcome") == b.get("outcome") and abs(a["playfulness_score"] - b["playfulness_score"]) <= 20 and abs(a["humor_score"] - b["humor_score"]) <= 20 and abs(self._canonical_roast_delta(a["playfulness_score"], a["humor_score"]) - self._canonical_roast_delta(b["playfulness_score"], b["humor_score"])) <= 8
+            return a.get("safety_class") == b.get("safety_class") and a.get("outcome") == b.get("outcome") and abs(a["playfulness_score"] - b["playfulness_score"]) <= 20 and abs(a["humor_score"] - b["humor_score"]) <= 20
         if kind == "duel":
-            return a.get("safety_class") == b.get("safety_class") and a.get("winner") == b.get("winner") and a.get("a_delta") == b.get("a_delta") and a.get("b_delta") == b.get("b_delta") and abs(a["entry_a_score"] - b["entry_a_score"]) <= 25 and abs(a["entry_b_score"] - b["entry_b_score"]) <= 25
+            return a.get("safety_class") == b.get("safety_class") and a.get("winner") == b.get("winner") and abs(a["entry_a_score"] - b["entry_a_score"]) <= 25 and abs(a["entry_b_score"] - b["entry_b_score"]) <= 25
         if kind == "chaos":
-            return a.get("valid") == b.get("valid") and a.get("chaos_class") == b.get("chaos_class") and self._canonical_chaos_delta(a.get("valid"), a.get("chaos_class")) == self._canonical_chaos_delta(b.get("valid"), b.get("chaos_class"))
+            return a.get("valid") == b.get("valid") and a.get("chaos_class") == b.get("chaos_class")
         if kind == "remix":
-            return a.get("safety_class") == b.get("safety_class") and a.get("allowed") == b.get("allowed") and abs(a["transformative_score"] - b["transformative_score"]) <= 20 and abs(a["humor_score"] - b["humor_score"]) <= 20 and abs(a["prompt_fit"] - b["prompt_fit"]) <= 20 and abs(self._canonical_remix_delta(a["transformative_score"], a["humor_score"], a["prompt_fit"]) - self._canonical_remix_delta(b["transformative_score"], b["humor_score"], b["prompt_fit"])) <= 10
+            return a.get("safety_class") == b.get("safety_class") and a.get("allowed") == b.get("allowed") and abs(a["transformative_score"] - b["transformative_score"]) <= 20 and abs(a["humor_score"] - b["humor_score"]) <= 20 and abs(a["prompt_fit"] - b["prompt_fit"]) <= 20
         return a.get("result_kind") == b.get("result_kind") and a.get("decision") == b.get("decision") and a.get("new_winner") == b.get("new_winner") and a.get("new_safety_class") == b.get("new_safety_class") and a.get("new_allowed") == b.get("new_allowed") and a.get("new_valid") == b.get("new_valid") and a.get("new_delta") == b.get("new_delta") and a.get("new_a_delta") == b.get("new_a_delta") and a.get("new_b_delta") == b.get("new_b_delta")
 
     def _canonical_winner(self, score_a: int, score_b: int) -> str:

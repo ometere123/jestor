@@ -201,6 +201,11 @@ def test_independent_agreement_rejects_malicious_threshold_and_decision_changes(
     block = dict(keep, decision="BLOCK", new_winner="NO_CONTEST", new_safety_class="UNSAFE", new_delta=0, new_a_delta=0, new_b_delta=0, new_allowed=False, new_valid=False)
     assert arena._agree("challenge", keep, block) is False
 
+    advisory_reward_a = {"safety_class": "SAFE", "prompt_fit": 80, "humor_score": 80, "originality_score": 80, "outcome": "ABSURD_GENIUS", "balance_delta": 1, "reason": "The reward field is advisory."}
+    advisory_reward_b = dict(advisory_reward_a, balance_delta=40)
+    assert arena._valid("caption", advisory_reward_a) is True
+    assert arena._agree("caption", advisory_reward_a, advisory_reward_b) is True
+
 
 def test_malformed_judgments_are_rejected_without_numeric_coercion(direct_vm, direct_deploy, direct_alice):
     arena = direct_deploy(CONTRACT)
