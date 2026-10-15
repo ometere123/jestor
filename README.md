@@ -17,17 +17,21 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | RPC | `https://studio.genlayer.com/api` |
 | CLI | repository-local `genlayer@0.39.1` |
 | GenVM linter | `genvm-linter==0.11.0` |
-| Verified Arena Circuit contract | `0x619da6669ab735a0a12EaCFaA3623Ce39ec035A2` |
-| Deployment transaction | `0xbcab72ffe995331bff52fd2ec2e35b7746f92887908c5de2148b9d13b5b6133c` |
-| Verified source SHA-256 | `011a53ebd0c62bdc1bc639d62d2439c0fae1c3769bc66e2cfc1fb67301c4eaf3` |
+| Verified Arena Circuit contract | `0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` |
+| Deployment transaction | `0xb4cd1e0b64e154183349e571086584b356db3f7df2bcbe9f0f323f1f851b8e0e` |
+| Verified source SHA-256 | `e6311c8981396a29e7e9ff839818043661d3bff8a0a8fbdaa42086b39fa2d48f` |
 | Production frontend | [jestor.vercel.app](https://jestor.vercel.app) |
 
 The release is one cohesive state machine in
 [contract/jestor_arena.py](/C:/Users/USER/Desktop/NEW%20GENLAYER%20BUILDS/jestor/contract/jestor_arena.py).
 The historical v0.2 deployment
 `0x148aEB21f9ED1aD76b38EDCC8d8c845b3E1F220A` remains a reference
-only. It is not silently migrated: the corrected deployment is a separate
-state baseline because no secure upgrade path was available.
+only. The superseded v0.4 candidate
+`0x46D843ee0e405Aba61B81bb3eFF1C0D29eCD0a3C` is also historical: a second
+audit found its permissionless bracket path could deadlock before materializing
+the final, so it was not promoted. The verified deployment above is a separate
+state baseline because no secure upgrade path was available; no historical
+records were silently migrated.
 
 ## Eight integrations
 
