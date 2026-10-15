@@ -15,6 +15,8 @@ async function injectedAccount(page: Page): Promise<{ address: string; chainId: 
 }
 
 async function connectWallet(page: Page): Promise<string> {
+  await page.goto("/");
+  await page.waitForLoadState("domcontentloaded");
   await page.getByRole("button", { name: "Connect Wallet" }).click();
   return (await injectedAccount(page)).address;
 }
@@ -37,6 +39,10 @@ test.describe("live Studionet sealed duel and verdict challenge", () => {
     const pageA = await browser.newPage();
     const pageB = await browser.newPage();
     const pageC = await browser.newPage();
+    await pageA.goto("/");
+    await pageA.waitForLoadState("domcontentloaded");
+    const hasInjectedProvider = await pageA.evaluate(() => Boolean((window as Window & { ethereum?: unknown }).ethereum));
+    test.skip(!hasInjectedProvider, "No injected EIP-1193 wallet is available in this browser; live transaction evidence must run in a wallet-enabled browser.");
     const accountA = await connectWallet(pageA);
     const accountB = await connectWallet(pageB);
     const accountC = await connectWallet(pageC);

@@ -169,6 +169,15 @@ async function challengeUntilSettled(accountName, resultId, text) {
     }
     if (result.contractError) {
       if (/Challenge window expired/i.test(result.receipt)) {
+        negativeTransactions.push({
+          method: "challenge_verdict",
+          resultId,
+          hash: result.hash,
+          finality: "FINALIZED",
+          consensus: "MAJORITY_AGREE",
+          execution: "ERROR",
+          expected: "Challenge window expired",
+        });
         console.log(`PASS expected finalized challenge expiry for ${resultId}; state remains unchanged.`);
         return { expired: true, result };
       }

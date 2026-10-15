@@ -1,6 +1,6 @@
 # Arena Circuit release evidence
 
-This file records evidence for the audited Arena Circuit release. It is kept
+This file records evidence for the corrected Arena Circuit release. It is kept
 with the source so a reader can reproduce the checks without treating UI
 animations, submitted transaction hashes, or mock adapters as proof.
 
@@ -13,11 +13,11 @@ animations, submitted transaction hashes, or mock adapters as proof.
 | RPC | `https://studio.genlayer.com/api` |
 | Local CLI | `genlayer@0.39.1` |
 | GenVM linter | `genvm-linter==0.11.0` |
-| Contract | `0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` |
-| Deployment transaction | `0xb4cd1e0b64e154183349e571086584b356db3f7df2bcbe9f0f323f1f851b8e0e` |
+| Contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
+| Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
 | Deployment status | `FINALIZED`, `MAJORITY_AGREE`, leader `SUCCESS` |
-| Contract source bytes | `86371` |
-| Contract source SHA-256 | `e6311c8981396a29e7e9ff839818043661d3bff8a0a8fbdaa42086b39fa2d48f` |
+| Contract source bytes | `93796` |
+| Contract source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
 
 The deployed source was retrieved from Studionet and compared byte-for-byte
 with `contract/jestor_arena.py`; both the byte count and SHA-256 matched. The
@@ -32,11 +32,13 @@ materializing a final; it is not the production address.
 The release candidate passed:
 
 - `genvm-lint contract/jestor_arena.py`: 3 checks passed.
-- `npm run test:direct`: 13 Direct Mode tests passed.
-- `npm run test:frontend:unit`: 6 frontend unit tests passed.
+- `npm run test:direct`: 21 Direct Mode tests passed.
+- `npm run test:frontend:unit`: 7 frontend unit tests passed.
 - `npm run lint`: passed.
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed; 14 Next.js routes generated.
+- `npm run test:e2e`: 2 local browser smoke tests passed; the real-wallet
+  test remained skipped because no injected provider was available.
 - `git diff --check`: passed for the release changes.
 
 GitHub Actions run
@@ -137,9 +139,9 @@ The positive high-margin circuit on that superseded candidate was challenge-gate
 The final match and champion receipt are appended after both challenge gates
 close.
 
-## Final-address Studionet evidence
+## Historical final-address Studionet evidence (previous contract)
 
-The final release runs used the address-bound deployment
+The previous release runs used the address-bound deployment
 `0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` and five serial CLI-managed
 wallets (`party_a`, `walletA`, `walletB`, `conveyance-deployer`, and
 `party_b`). The fifth wallet was not registered in the circuits and acted only
@@ -249,7 +251,7 @@ The `0x72b8…dccb2` receipt was independently read as `status=7`,
 The final state, career, and leaderboard were then read through
 `LATEST_FINAL`; no UI or submitted hash was used as evidence.
 
-## Production frontend
+## Historical production frontend (previous contract)
 
 The existing Vercel project is `delealufejoel-4184s-projects/jestor`.
 Production and Preview configuration were updated through the Vercel CLI to
@@ -278,3 +280,11 @@ duel drafts survive reloads in the same browser profile, but cannot be
 recovered after secure browser storage is cleared or in a different profile.
 Decorative validator animations are never consensus evidence; public verdict
 pages rely on finalized state and receipt verification.
+
+## Corrective final release
+
+The final corrective deployment, five-wallet Studionet evidence, authoritative
+state readbacks, source hashes, and the production deployment are recorded in
+the [corrected deployment manifest](deployment-manifest.md). That manifest is
+the current release record; the older tables above are retained only for
+historical audit traceability and do not describe the production contract.

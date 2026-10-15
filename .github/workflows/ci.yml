@@ -41,6 +41,9 @@ jobs:
       - name: TypeScript
         run: npx tsc --noEmit --pretty false
 
+      - name: Production dependency audit
+        run: npm audit --omit=dev
+
       - name: Frontend protocol unit tests
         run: npm run test:frontend:unit
 

@@ -19,11 +19,11 @@
     "framer-motion": "^12.40.0",
     "genlayer-js": "^1.1.8",
     "lucide-react": "^1.18.0",
-    "next": "16.2.9",
+    "next": "16.4.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "tailwind-merge": "^3.6.0",
-    "viem": "^2.52.2",
+    "viem": "2.57.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -34,7 +34,7 @@
     "@types/react-dom": "^19",
     "cross-env": "^10.1.0",
     "eslint": "^9",
-    "eslint-config-next": "16.2.9",
+    "eslint-config-next": "16.4.2",
     "genlayer": "0.39.1",
     "tailwindcss": "^4",
     "typescript": "^5"

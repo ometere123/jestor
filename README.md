@@ -17,9 +17,10 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | RPC | `https://studio.genlayer.com/api` |
 | CLI | repository-local `genlayer@0.39.1` |
 | GenVM linter | `genvm-linter==0.11.0` |
-| Verified Arena Circuit contract | `0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` |
-| Deployment transaction | `0xb4cd1e0b64e154183349e571086584b356db3f7df2bcbe9f0f323f1f851b8e0e` |
-| Verified source SHA-256 | `e6311c8981396a29e7e9ff839818043661d3bff8a0a8fbdaa42086b39fa2d48f` |
+| Verified Arena Circuit contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
+| Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
+| Verified source bytes | `93796` |
+| Verified source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
 | Production frontend | [jestor.vercel.app](https://jestor.vercel.app) |
 
 The release is one cohesive state machine in
@@ -29,9 +30,12 @@ The historical v0.2 deployment
 only. The superseded v0.4 candidate
 `0x46D843ee0e405Aba61B81bb3eFF1C0D29eCD0a3C` is also historical: a second
 audit found its permissionless bracket path could deadlock before materializing
-the final, so it was not promoted. The verified deployment above is a separate
-state baseline because no secure upgrade path was available; no historical
-records were silently migrated.
+the final, so it was not promoted. The previous verified v0.4 deployment
+`0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` and deployment transaction
+`0xb4cd1e0b64e154183349e571086584b356db3f7df2bcbe9f0f323f1f851b8e0e` are
+also retained as historical references. The corrected deployment above is a
+separate state baseline because no secure upgrade path was available; no
+historical records were silently migrated.
 
 ## Eight integrations
 
@@ -110,7 +114,12 @@ Balances are bounded non-financial points. Every effect is capped by game
 limits, a daily gain cap, a daily loss cap, and a zero floor. A correction
 reverses the originally applied actual delta before applying the corrected
 effect, so daily accounting, leaderboard keys, profile counters, career events,
-and badges remain consistent.
+and badges remain consistent. The `+180` and `−50` limits count actual balance
+movement, not requested rewards; partial awards, zero-floor losses, repeated
+effects, and cap exhaustion are all bounded. A cross-day correction reverses
+the historical balance effect without manufacturing allowance in the current
+UTC day. A competitive KEEP challenge is an economic no-op; only ADJUST or
+BLOCK can apply a new bounded effect.
 
 The original verdict is immutable. Challenge history is stored per result
 (bounded to twelve phases), not in a latest-global-record window. A result
@@ -171,6 +180,9 @@ npm run test:frontend:unit
 npx tsc --noEmit --pretty false
 npm run lint
 npm run build
+npm audit --omit=dev
+npm run test:e2e
+npm run test:e2e:live
 python -m pytest tests/direct -q
 $env:PYTHONIOENCODING = "utf-8"
 & "$env:LOCALAPPDATA\Python\pythoncore-3.14-64\Scripts\genvm-lint.exe" contract/jestor_arena.py
@@ -181,8 +193,8 @@ wallets. It switches the CLI account context for each write and never reads,
 exports, prints, or stores private keys:
 
 ```powershell
-$env:GL_CONTRACT = "0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7"
-$env:CLI_ARENA_ACCOUNTS = "party_a,walletA,walletB,conveyance-deployer"
+$env:GL_CONTRACT = "0x3B7106e084F89EC2B6b01C27E2ada161B0728B36"
+$env:CLI_ARENA_ACCOUNTS = "party_a,walletA,walletB,conveyance-deployer,party_b"
 node scripts/cli-wallet-smoke.mjs
 ```
 
@@ -197,9 +209,13 @@ history, career, and ranked leaderboard readback. `scripts/test-all.mjs` and
 manual GitHub job; that runner accepts private-key secrets only through the
 process environment and never logs them.
 
-GitHub Actions runs TypeScript, ESLint, the pinned GenVM linter, Direct Mode,
-and the production build on every push and pull request. The live suite is
-manual and secret-dependent.
+GitHub Actions runs TypeScript, ESLint, frontend unit tests, Chromium browser
+smoke tests, the pinned GenVM linter, Direct Mode, and the production build on
+every push and pull request. The live CLI suite is manual and secret-dependent.
+The Playwright live suite is explicitly gated by `JESTOR_E2E_LIVE=true` and
+requires three real injected EIP-1193 accounts on chain `61999`; it fails
+closed when no provider is present and never substitutes simulated wallet
+transactions.
 
 ## Deployment and source verification
 
