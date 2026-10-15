@@ -39,14 +39,24 @@ async function cli(args) {
       return /[\s"]/.test(text) ? `"${text.replace(/(["\\])/g, "\\$1")}"` : text;
     })
     : args;
-  try {
-    const result = await run(CLI, invokeArgs, { cwd: process.cwd(), windowsHide: true, shell: process.platform === "win32", maxBuffer: 16 * 1024 * 1024 });
-    return result.stdout + result.stderr;
-  } catch (error) {
-    const stdout = error?.stdout ?? "";
-    const stderr = error?.stderr ?? "";
-    throw new Error(`CLI failed (${args.join(" ")}): ${stdout}${stderr}`.slice(0, 4000));
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const result = await run(CLI, invokeArgs, { cwd: process.cwd(), windowsHide: true, shell: process.platform === "win32", maxBuffer: 16 * 1024 * 1024 });
+      return result.stdout + result.stderr;
+    } catch (error) {
+      const stdout = error?.stdout ?? "";
+      const stderr = error?.stderr ?? "";
+      const details = `${stdout}${stderr}`;
+      if (/Rate limit exceeded/i.test(details) && attempt < 3) {
+        const delay = 15000 * (attempt + 1);
+        console.log(`RPC rate limit; retrying CLI call in ${delay / 1000}s.`);
+        await sleep(delay);
+        continue;
+      }
+      throw new Error(`CLI failed (${args.join(" ")}): ${details}`.slice(0, 4000));
+    }
   }
+  throw new Error(`CLI failed (${args.join(" ")}).`);
 }
 
 async function useAccount(name) {
