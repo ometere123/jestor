@@ -133,15 +133,50 @@ listed write was checked for `FINALIZED`, `MAJORITY_AGREE`, and leader
 tests. The final tournament row is completed after the scheduled challenge
 windows close.
 
+| Lifecycle | Final deployment transaction / readback |
+| --- | --- |
+| Four profile setup writes | `0x9e89d95487810a4e6406ea09317617baacf17ce2655599f89c140ff39e33d178`, `0xea54c5a1c36e788b3b1e46a9a16c0f15231eaeabb406d7f04cafbed7909a2cbf`, `0x9da966fdbcd08d3cf1c86b6cd3cfe3312569869e38d7549ffd4eb15fd0893f87`, `0x8f76674e6e738a4774ee52fd827e6c67fe39c5f999790fbd33aa10337c1cfac4` | finalized majority-agree success |
+| Prompt approval | `0xe36740d05cf9fa0c2045e4ec99be80b6122a5bc913ec1cfc64a2688d0793a0c5` → prompt `436ecefc71cedf930b7f9589` | approved and active |
+| Invalid prompt reference | `0x5cdf4a92948f3dd622b03acd1764355f08edf84e19fc0d3ced925332b3b50183` | finalized contract rejection |
+| Accepted caption | `0x83ec2ccc2b74dc903583d5589da7a30dd98b0d1792c2b29b59f0ad0ba83cf1a9` → `2ed8cc64355237442e8ee0bd` | finalized, actual delta `45` |
+| Accepted roast | `0xd657723a22d4b8bf88b47a454e31a25eb3de70a8a589da639c6c8ed976f612af` → `fb140ec3958f70128e224e97` | finalized, then challenged |
+| Finalized challenge correction | `0x593a88d21115a7d98c4d76d5c50bcd618f006397354aac5f4a90ac5105438b90` | KEEP, immutable original preserved, actual delta `19` |
+| Chaos action | `0x8bd068fce2f965660e18d79013ede8052bf4a94dd032659a3080db77faf05423` → `063de288a4e6e0b0419d4bab` | `CONFETTI`, actual delta `15` |
+| Accepted remix | `0x360ebb315f754b1265a0fc8e72b11b99729d706ab310ce098ada43a56d52bc75` → `7fd72f44910b3d78c4b2b350` | attributed to caption `2ed8cc64355237442e8ee0bd`, actual delta `53` |
+| Copied remix rejection | `0x05b91a226396a1271c75603483a07a8d77b05d91802d1eb559aab797e2b431a0` | finalized majority-agree contract error; no mutation |
+
+### Final sealed duel
+
+| Lifecycle | Transaction / readback |
+| --- | --- |
+| Start / Player A commit | `0xb036266f91538699d440f99e4bd7315b6dc850184e2c233f2826d97cf257ef3c` |
+| Premature Player A reveal rejection | `0xcff08e531c3dab62e6f20187a96b6f2a7031c1ec5240225123535976d7b4cecd` |
+| Player B join | `0x2826c5f326b8b583f3fec67117b7690547657ba0110542de3254cb6a4d895636` |
+| Player A reveal | `0xee026343809977e75246ac50f0f88867066913d7f4d488073ed8efcb0790a289` |
+| Player B reveal | `0x85062b7a34f7c6337bc9eecdf3752b5d5beb040a84301111ac60a17ef85c917a` |
+| Permissionless resolve | `0x30166348fef8df3ff40fe4a8225613e2b6ebbb22c864bdada5775c2e48d271df` |
+
+The final-address duel was read back as finalized and resolved after both
+reveals; the pre-reveal read returned empty entries. Its commitment payload
+included chain `61999`, the deployed contract address, the duel id, prompt,
+participant, salt, and trimmed entry.
+
 ## Production frontend
 
 The existing Vercel project is `delealufejoel-4184s-projects/jestor`.
 Production and Preview configuration were updated through the Vercel CLI to
 the contract above with chain `61999`, RPC
 `https://studio.genlayer.com/api`, and
-`NEXT_PUBLIC_USE_MOCK_CONTRACT=false`. The final production deployment id,
-URL, and smoke result are appended here after deployment from the release
-commit.
+`NEXT_PUBLIC_USE_MOCK_CONTRACT=false`. The final production deployment is
+`dpl_G42MWzZSa6EMD6z6JXrUKhQk1AAH` (`READY`), inspect URL
+`https://vercel.com/delealufejoel-4184s-projects/jestor/G42MWzZSa6EMD6z6JXrUKhQk1AAH`,
+and production alias `https://jestor.vercel.app`. An HTTP smoke returned 200;
+the served JavaScript contained the final contract address, Studionet RPC,
+chain `61999`, and injected `window.ethereum` wallet logic. The homepage,
+duels, circuit, and public verdict routes rendered in the in-app browser. The
+Chrome extension provider was unavailable in this audit session, so no browser
+transaction was claimed as evidence; the four-wallet CLI run below is the
+authoritative live write/readback evidence.
 
 ## Historical state and limitations
 

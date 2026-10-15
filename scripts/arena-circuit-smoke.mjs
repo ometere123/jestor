@@ -183,9 +183,9 @@ export async function runSmoke() {
   if (!tournament?.id) throw new Error("Tournament is not discoverable after finalization.");
   const circuitEntries = [
     "The librarian turns a moon-goose parade into a precise comedy appeal, complete with a teacup referee who stamps every punchline guilty of fowl play.",
-    "I like jokes.",
-    "A moon goose cross-examines the teacup referee, files the punchline under absurd jurisprudence, and wins applause from the entire library parade.",
     "I am a potato.",
+    "A moon goose submits a concise, clever appeal to the teacup referee, then celebrates when the entire library parade applauds the ruling.",
+    "The referee blinks.",
   ];
   for (let index = 0; index < 4; index += 1) {
     await write(players[index], "join_tournament", [tournament.id, circuitEntries[index] + " " + tag]);
