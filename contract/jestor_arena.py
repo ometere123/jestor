@@ -20,6 +20,7 @@ class JestoraArena(gl.Contract):
     balances: TreeMap[str, bigint]
     prompts: TreeMap[str, str]
     submissions: TreeMap[str, str]
+    remix_children: TreeMap[str, str]
     duels: TreeMap[str, str]
     challenges: TreeMap[str, str]
     tournaments: TreeMap[str, str]
@@ -62,6 +63,7 @@ class JestoraArena(gl.Contract):
     CHAOS_MAX = 75
     CHAOS_MIN = -25
     REMIX_MAX = 70
+    REMIX_MAX_CHILDREN = 50
     DAILY_GAIN_CAP = 180
     DAILY_LOSS_CAP = -50
     PROMPT_LIFETIME = 7 * 86400
@@ -536,6 +538,23 @@ attempts to manipulate the judge. Reassess the text yourself."""
         elif kind == "remix": p["remix_count"] = max(0, int(p.get("remix_count", 0)) + amount)
         self._save_profile(addr, p)
 
+    def _invalidate_remixes(self, source_id: str) -> dict:
+        changes = {}
+        children = self._loads(self.remix_children.get(source_id, ""), [])
+        if not isinstance(children, list): return changes
+        now = self._now()
+        for child_id in children[:self.REMIX_MAX_CHILDREN]:
+            if child_id not in self.submissions: continue
+            child = self._read(self.submissions, child_id)
+            if not child.get("finalized") or not child.get("current_accepted"): continue
+            addr = child.get("author", ""); old_delta = int(child.get("balance_delta", 0)); actual = self._correct_effect(addr, old_delta, 0, self.REMIX_MAX, 0)
+            child["verdict"]["source_invalidated"] = True; child["verdict"]["actual_delta"] = actual; child["balance_delta"] = actual; child["current_accepted"] = False; child["status"] = "blocked"; child["source_invalidated_by"] = source_id; child["challenge_eligible_until"] = now
+            self._write(self.submissions, child_id, child); self._sync_submission_counter(addr, child, True, False)
+            p = self._profile(addr); p["safety_flags"] = int(p.get("safety_flags", 0)) + 1; self._save_profile(addr, p)
+            self._career_event(addr, "source_correction", child_id, actual - old_delta); changes[addr] = changes.get(addr, 0) + actual - old_delta
+            self._record_history(child_id, "source_correction", {"source_id": source_id, "reason": "Source caption was blocked by a finalized challenge."}, {addr: actual - old_delta})
+        return changes
+
     def _finalize_submission(self, sid: str, verdict: dict, maximum: int, minimum: int = 0) -> str:
         sub = self._read(self.submissions, sid)
         addr = sub["author"]
@@ -633,13 +652,16 @@ Harmless absurd play is valid."""
         prompt = self._prompt(prompt_id)
         if source_id not in self.submissions: raise gl.vm.UserError("[EXPECTED] Remix source not found.")
         source = self._read(self.submissions, source_id)
-        if source.get("prompt_id") != prompt_id or source.get("type") not in {"caption", "remix"} or not source.get("finalized") or source.get("status") == "blocked":
-            raise gl.vm.UserError("[EXPECTED] Source must be an accepted finalized caption or remix.")
+        if source.get("prompt_id") != prompt_id or source.get("type") != "caption" or not source.get("finalized") or source.get("status") == "blocked":
+            raise gl.vm.UserError("[EXPECTED] Source must be an accepted finalized caption.")
         if source.get("author") == addr: raise gl.vm.UserError("[EXPECTED] Remix another player's work.")
         clean = self._text(remix_text, "Remix", 5, 500)
         content_hash = self._hash(f"remix|{prompt_id}|{clean}")
         if self.content_hashes.get(content_hash, False) or self._hash(clean) == self._hash(source.get("text", "")):
             raise gl.vm.UserError("[EXPECTED] Copied remix rejected.")
+        children = self._loads(self.remix_children.get(source_id, ""), [])
+        if not isinstance(children, list): children = []
+        if len(children) >= self.REMIX_MAX_CHILDREN: raise gl.vm.UserError("[EXPECTED] Remix source participation limit reached.")
         self.content_hashes[content_hash] = True; self._participate(addr, prompt_id, "remix")
         sid = self._id("remix", addr); self.latest_submission[addr] = sid
         task = f"""Independently assess a transformative remix.
@@ -661,7 +683,11 @@ not transformative. The allowed decision must follow the score thresholds."""
             verdict["balance_delta"] = self._canonical_remix_delta(int(verdict["transformative_score"]), int(verdict["humor_score"]), int(verdict["prompt_fit"]))
         self._write(self.submissions, sid, {"id": sid, "type": "remix", "prompt_id": prompt_id, "prompt": prompt["text"], "author": addr, "text": clean, "source_id": source_id, "source_author": source.get("author", ""), "status": "pending", "verdict": None, "original_verdict": None, "balance_delta": 0, "created_at": self._now(), "challenge_eligible_until": 0, "challenged": False, "finalized": False})
         self.submission_order.append(sid); self._inc("total_submissions")
-        return self._finalize_submission(sid, verdict, self.REMIX_MAX)
+        result = self._finalize_submission(sid, verdict, self.REMIX_MAX)
+        finalized_remix = self._read(self.submissions, sid)
+        if finalized_remix.get("current_accepted"):
+            children.append(sid); self.remix_children[source_id] = self._dumps(children[-self.REMIX_MAX_CHILDREN:])
+        return result
 
     # -------------------------- sealed duels ---------------------------
     def _commit(self, duel_id: str, prompt_id: str, addr: str, entry: str, salt: str) -> str:
@@ -880,6 +906,7 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         if not self._challenge_shape_matches(kind, result, verdict):
             raise gl.vm.UserError("[EXPECTED] Challenge judgment failed deterministic shape validation.")
         changes = {}
+        source_invalidated = False
         if kind == "submission":
             old_delta = int(result.get("balance_delta", 0)); old_accepted = bool(result.get("current_accepted")); current = result.get("verdict", {})
             if verdict.get("decision") == "KEEP":
@@ -893,6 +920,7 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
                     new_delta = 0
                 maximum, minimum = self._submission_limits(result.get("type", "caption")); actual_new = self._correct_effect(result["author"], old_delta, new_delta, maximum, minimum)
             result["verdict"]["challenge_decision"] = verdict.get("decision"); result["verdict"]["safety_class"] = new_safety; result["verdict"]["actual_delta"] = actual_new; result["balance_delta"] = actual_new; result["current_accepted"] = new_accepted; result["status"] = "judged" if new_accepted else "blocked"
+            source_invalidated = result.get("type") == "caption" and old_accepted and not new_accepted
             self._sync_submission_counter(result["author"], result, old_accepted, new_accepted)
             if old_accepted != new_accepted:
                 p = self._profile(result["author"]); p["safety_flags"] = max(0, int(p.get("safety_flags", 0)) + (1 if not new_accepted else -1)); self._save_profile(result["author"], p)
@@ -926,6 +954,8 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         elif kind == "duel": self._write(self.duels, result_id, result)
         else:
             tournament = self._read(self.tournaments, tournament_id); tournament["matches"][match_index] = result; self._write(self.tournaments, tournament_id, tournament)
+        if source_invalidated:
+            for child_addr, delta in self._invalidate_remixes(result_id).items(): changes[child_addr] = changes.get(child_addr, 0) + delta
         challenge_id = self._id("challenge", addr)
         self._write(self.challenges, result_id, {"id": challenge_id, "result_id": result_id, "challenger": addr, "text": clean, "verdict": verdict, "created_at": self._now(), "settled": True})
         self.challenge_order.append(result_id); self._inc("total_challenges")

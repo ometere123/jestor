@@ -92,6 +92,21 @@ def mock_challenge_block(vm):
     )
 
 
+def mock_remix(vm):
+    vm.mock_llm(
+        r"Independently assess a transformative remix.*",
+        json.dumps({
+            "allowed": True,
+            "safety_class": "SAFE",
+            "transformative_score": 80,
+            "humor_score": 80,
+            "prompt_fit": 80,
+            "balance_delta": 53,
+            "reason": "Distinct safe transformation.",
+        }),
+    )
+
+
 def create_profiles(arena, vm, accounts):
     for index, account in enumerate(accounts):
         vm.sender = account
@@ -218,6 +233,31 @@ def test_challenge_is_substantive_idempotent_and_preserves_original_history(dire
     assert len(arena.get_verdict_history(submission_id, 12)) == 2
     with direct_vm.expect_revert("already challenged"):
         arena.challenge_verdict(submission_id, "A repeated challenge must be rejected.")
+
+
+def test_blocked_source_propagates_to_accepted_remix(direct_vm, direct_deploy, direct_accounts):
+    arena = direct_deploy(CONTRACT)
+    author, remixer, challenger = direct_accounts[:3]
+    create_profiles(arena, direct_vm, [author, remixer, challenger])
+    prompt_id = create_prompt(arena, direct_vm, author, "A moon goose files a comedy appeal with a teacup referee.")
+    direct_vm.sender = author
+    mock_caption(direct_vm)
+    source_id = arena.submit_caption(prompt_id, "The goose filed the punchline before the referee stamped it.")
+    direct_vm.sender = remixer
+    mock_remix(direct_vm)
+    remix_id = arena.submit_remix(prompt_id, source_id, "The goose became chief auditor and appealed the stamp to a cabinet.")
+    assert arena.get_submission(remix_id)["status"] == "judged"
+    assert arena.get_profile(address(remixer))["remix_count"] == 1
+    direct_vm.sender = challenger
+    mock_challenge_block(direct_vm)
+    arena.challenge_verdict(source_id, "Reassess the source caption safety and deterministic settlement.")
+    child = arena.get_submission(remix_id)
+    assert child["status"] == "blocked"
+    assert child["current_accepted"] is False
+    assert child["source_invalidated_by"] == source_id
+    assert child["balance_delta"] == 0
+    assert arena.get_profile(address(remixer))["remix_count"] == 0
+    assert len(arena.get_verdict_history(remix_id, 12)) == 2
 
 
 def test_balance_correction_respects_zero_floor_and_daily_accounting(direct_vm, direct_deploy, direct_alice):
