@@ -59,7 +59,7 @@ async function cli(args) {
   throw new Error(`CLI failed (${args.join(" ")}).`);
 }
 
-async function useAccount(name) {
+async function selectAccount(name) {
   await cli(["account", "use", name]);
 }
 
@@ -87,13 +87,20 @@ function receiptEvidence(output) {
   return { finalized, majority, success, error, leaderExecution };
 }
 
+function receiptSummary(output) {
+  const status = output.match(/status_name:\s*['"]([^'"]+)['"]/i)?.[1] ?? output.match(/status:\s*(\d+)/i)?.[1] ?? "unknown";
+  const result = output.match(/result_name:\s*['"]([^'"]+)['"]/i)?.[1] ?? output.match(/result:\s*(\d+)/i)?.[1] ?? "unknown";
+  const votes = [...output.matchAll(/vote:\s*['"]([^'"]+)['"]/gi)].map((match) => match[1]).slice(0, 6);
+  return `status=${status} result=${result} leader=${receiptEvidence(output).leaderExecution ?? "unknown"} votes=${votes.join(",") || "unknown"}`;
+}
+
 async function write(accountName, method, args = [], options = {}) {
-  await useAccount(accountName);
+  await selectAccount(accountName);
   const output = await cli(["write", CONTRACT, method, "--rpc", RPC, "--args", ...args]);
   const hash = extractHash(output);
   const receipt = await cli(["receipt", hash, "--rpc", RPC, "--status", "FINALIZED"]);
   const evidence = receiptEvidence(receipt);
-  if (!evidence.finalized || !evidence.majority) throw new Error(`${method} did not reach FINALIZED / MAJORITY_AGREE.`);
+  if (!evidence.finalized || !evidence.majority) throw new Error(`${method} did not reach FINALIZED / MAJORITY_AGREE (${hash}; ${receiptSummary(receipt)}).`);
   if (options.expectError) {
     if (!evidence.error || evidence.success) throw new Error(`${method} was not a finalized contract rejection.`);
     negativeTransactions.push({ method, hash, finality: "FINALIZED", consensus: "MAJORITY_AGREE", execution: "ERROR" });
@@ -108,7 +115,21 @@ async function write(accountName, method, args = [], options = {}) {
 }
 
 async function read(method, args = []) {
-  return client.readContract({ address: CONTRACT, functionName: method, args, transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return await client.readContract({ address: CONTRACT, functionName: method, args, transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
+    } catch (error) {
+      const details = error instanceof Error ? error.message : String(error);
+      if (/Rate limit exceeded/i.test(details) && attempt < 3) {
+        const delay = 15000 * (attempt + 1);
+        console.log(`RPC rate limit on read; retrying in ${delay / 1000}s.`);
+        await sleep(delay);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw new Error(`Read failed: ${method}`);
 }
 
 function duelId(promptId, address, nonce) {
@@ -223,6 +244,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error(`FAIL ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   }).finally(async () => {
-    try { await useAccount("praest-deployer"); } catch { /* preserve original failure */ }
+    try { await selectAccount("praest-deployer"); } catch { /* preserve original failure */ }
   });
 }

@@ -40,9 +40,9 @@ async function main() {
     fullTransaction: true,
   });
 
-  const resultName = receipt?.resultName ?? ({ 6: "MAJORITY_AGREE", 7: "MAJORITY_DISAGREE" }[receipt?.result]);
+  const resultName = receipt?.resultName ?? receipt?.result_name ?? ({ 6: "MAJORITY_AGREE", 7: "MAJORITY_DISAGREE" }[receipt?.result]);
   const execution = receipt?.consensus_data?.leader_receipt?.[0]?.execution_result ?? receipt?.txExecutionResultName;
-  const finalized = receipt?.statusName === "FINALIZED" || receipt?.status === 7;
+  const finalized = receipt?.statusName === "FINALIZED" || receipt?.status_name === "FINALIZED" || receipt?.status === 7;
   if (!finalized || resultName !== "MAJORITY_AGREE" || execution !== "SUCCESS") {
     throw new Error("Deployment did not produce a finalized successful majority-agree receipt.");
   }

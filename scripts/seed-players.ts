@@ -31,9 +31,11 @@ async function read(player: typeof players[number], method: string, args: unknow
 async function write(player: typeof players[number], method: string, args: unknown[]) {
   const hash = await player.client.writeContract({ address, functionName: method, args: args as CalldataEncodable[], value: BigInt(0) });
   const receipt = await player.client.waitForTransactionReceipt({ hash, status: TransactionStatus.FINALIZED, retries: 180, interval: 5000 });
-  const resultName = receipt.resultName ?? ({ 6: "MAJORITY_AGREE", 7: "MAJORITY_DISAGREE" } as Record<number, string>)[receipt.result as number];
+  const rawReceipt = receipt as typeof receipt & { status_name?: string; result_name?: string };
+  const statusName = receipt.statusName ?? rawReceipt.status_name ?? ({ 7: "FINALIZED" } as Record<number, string>)[receipt.status as number];
+  const resultName = receipt.resultName ?? rawReceipt.result_name ?? ({ 6: "MAJORITY_AGREE", 7: "MAJORITY_DISAGREE" } as Record<number, string>)[receipt.result as number];
   const execution = receipt.consensus_data?.leader_receipt?.[0]?.execution_result ?? receipt.txExecutionResultName;
-  if (receipt.statusName !== "FINALIZED" || resultName !== "MAJORITY_AGREE" || execution !== "SUCCESS") {
+  if (statusName !== "FINALIZED" || resultName !== "MAJORITY_AGREE" || execution !== "SUCCESS") {
     throw new Error(method + " did not produce a finalized successful majority-agree receipt.");
   }
   console.log(player.name + " " + method + " finalized: " + String(hash));
