@@ -130,6 +130,7 @@ This section is populated from finalized command output after deployment and pro
 - Deployment transaction: `0xc5b366e8dbd99ed2d94b5014392c3b3abbd6ba0c946d92f34e632946398e66e5` (`FINALIZED`, result `6`, leader `SUCCESS`, `MAJORITY_AGREE`)
 - Local source SHA-256: `efdd4e9c8fccf67e5dbcc242f21969f1296fda6083c05b179007426fd6f1c1d5`
 - Retrieved deployed-source SHA-256: `efdd4e9c8fccf67e5dbcc242f21969f1296fda6083c05b179007426fd6f1c1d5` (55,269 normalized bytes; exact match)
+- GitHub branch: [`codex/arena-circuit`](https://github.com/ometere123/jestor/tree/codex/arena-circuit); implementation commit: `448a1c3`
 - Vercel project: `delealufejoel-4184s-projects/jestor`
 - Vercel deployment: [`dpl_Cwghv8DeMcTE8XhHb4rXWoE6XKN1`](https://vercel.com/delealufejoel-4184s-projects/jestor/Cwghv8DeMcTE8XhHb4rXWoE6XKN1), READY production alias [`jestor.vercel.app`](https://jestor.vercel.app)
 - Live integration suite: 25 finalized Studionet transactions, all `MAJORITY_AGREE`; covered four profiles, prompt moderation, invalid-reference rollback, caption, challenge and duplicate-challenge rejection, roast, chaos, remix and copy rejection, sealed duel hidden-entry/wrong-salt/replay checks, and a complete four-player tournament.
