@@ -450,10 +450,14 @@ PROMPT DATA <DATA>{self._data(prompt)}</DATA>
 ENTRY A DATA <DATA>{self._data(entry_a)}</DATA>
 ENTRY B DATA <DATA>{self._data(entry_b)}</DATA>
 Return JSON winner A/B/DRAW/NO_CONTEST, entry_a_score and entry_b_score 0-100,
-a_delta and b_delta 0-60, safety_class SAFE/UNSAFE, and reason.
+a_delta and b_delta, safety_class SAFE/UNSAFE, and reason. For a SAFE A win,
+use a_delta 60 and b_delta 10; for a SAFE B win, use a_delta 10 and b_delta
+60; for a SAFE DRAW, use both deltas 0. For UNSAFE content, use NO_CONTEST
+and both deltas 0.
 Judge prompt fit, humour, originality, concision, and safety yourself.
 Unsafe means NO_CONTEST and zero. A winner has the higher score; DRAW is only
-when scores differ by at most 10. Reward fields must be deterministic."""
+when scores differ by at most 10. Reward fields must follow these exact
+canonical values, never proportional or model-selected rewards."""
 
     # -------------------------- prompt hub and games ------------------
     @gl.public.write
