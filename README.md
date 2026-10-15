@@ -176,24 +176,26 @@ $env:PYTHONIOENCODING = "utf-8"
 & "$env:LOCALAPPDATA\Python\pythoncore-3.14-64\Scripts\genvm-lint.exe" contract/jestor_arena.py
 ```
 
-The canonical secret-dependent live suite requires four to six existing
-CLI-managed test wallets exposed only to the process as `GL_PK1`
-through `GL_PK6`:
+The canonical local live suite uses four to six existing named CLI-managed
+wallets. It switches the CLI account context for each write and never reads,
+exports, prints, or stores private keys:
 
 ```powershell
-$env:GL_CONTRACT = "0x..."
-$env:GL_PK1 = "0x..."; $env:GL_PK2 = "0x..."
-$env:GL_PK3 = "0x..."; $env:GL_PK4 = "0x..."
-node scripts/arena-circuit-smoke.mjs
+$env:GL_CONTRACT = "0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7"
+$env:CLI_ARENA_ACCOUNTS = "party_a,walletA,walletB,conveyance-deployer"
+node scripts/cli-wallet-smoke.mjs
 ```
 
-The suite refuses any chain other than 61999, checks native funding, waits for
-`FINALIZED` and `MAJORITY_AGREE`, rejects RPC failures as
-test outcomes, and covers prompt approval, invalid references, caption, roast,
-chaos, remix attribution/copy rejection, duel secrecy/replay, one challenge,
-four-player tournament progression, challenge-window gates, final settlement,
-verdict history, career, and ranked leaderboard readback. `scripts/test-all.mjs`
-and `scripts/qa.mjs` are aliases for this same suite.
+The CLI suite refuses any chain other than 61999, checks native funding, waits
+for `FINALIZED` and `MAJORITY_AGREE`, retries the same hash after receipt-RPC
+failures, and rejects RPC failures as test outcomes. Its five-wallet release
+run covers prompt approval, invalid references, caption, roast, chaos, remix
+attribution/copy rejection, duel secrecy/replay, challenge disagreement and
+correction, blocked DRAW handling, positive tournament progression, verdict
+history, career, and ranked leaderboard readback. `scripts/test-all.mjs` and
+`scripts/qa.mjs` are aliases for the secure-key integration runner used by the
+manual GitHub job; that runner accepts private-key secrets only through the
+process environment and never logs them.
 
 GitHub Actions runs TypeScript, ESLint, the pinned GenVM linter, Direct Mode,
 and the production build on every push and pull request. The live suite is

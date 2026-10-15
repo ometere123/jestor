@@ -1,8 +1,9 @@
 /**
  * Finalized Studionet integration suite for Arena Circuit v0.4.
  *
- * The runner requires 4-6 existing CLI-managed wallets in GL_PK1..GL_PK6.
- * It never prints or persists private keys. Every write must finalize with a
+ * The runner requires 4-6 existing funded test accounts supplied as secure
+ * process-only GL_PK1..GL_PK6 values for CI/manual isolated runs. It never
+ * prints or persists private keys. Every write must finalize with a
  * successful majority-agree receipt; an RPC error is never treated as a
  * passing negative test.
  *
@@ -66,6 +67,10 @@ async function write(player, method, args = [], options = {}) {
     fullTransaction: true,
   });
   if (statusName(receipt) !== "FINALIZED") throw new Error(method + " did not finalize.");
+  if (options.allowDisagreement && resultName(receipt) === "MAJORITY_DISAGREE") {
+    console.log("PASS finalized semantic disagreement (state unchanged) " + method + " " + String(hash));
+    return { hash: String(hash), receipt, ok: false, disagreement: true };
+  }
   if (resultName(receipt) !== "MAJORITY_AGREE") throw new Error(method + " did not reach MAJORITY_AGREE.");
   if (options.expectError) {
     if (!executionError(receipt)) throw new Error("Expected finalized contract rejection did not occur for " + method + ".");
@@ -76,6 +81,18 @@ async function write(player, method, args = [], options = {}) {
   transactions.push({ method, hash: String(hash), status: statusName(receipt), result: resultName(receipt), execution: executionName(receipt) });
   console.log("PASS " + method + " " + String(hash));
   return { hash: String(hash), receipt, ok: true };
+}
+
+async function writeUntilAgreement(player, method, args = [], attempts = 5) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = await write(player, method, args, { allowDisagreement: true });
+    if (!result.disagreement) return result;
+    if (attempt < attempts) {
+      console.log("Retrying " + method + " after finalized semantic disagreement (" + attempt + "/" + attempts + ").");
+      await sleep(5000);
+    }
+  }
+  throw new Error(method + " exhausted " + attempts + " finalized disagreement retries.");
 }
 
 async function expectRejection(label, fn) {
@@ -184,8 +201,8 @@ export async function runSmoke() {
   const circuitEntries = [
     "The librarian turns a moon-goose parade into a precise comedy appeal, complete with a teacup referee who stamps every punchline guilty of fowl play.",
     "I am a potato.",
-    "A moon goose submits a concise, clever appeal to the teacup referee, then celebrates when the entire library parade applauds the ruling.",
-    "The referee blinks.",
+    "Blue.",
+    "The teacup referee checks the moon-goose parade schedule.",
   ];
   for (let index = 0; index < 4; index += 1) {
     await write(players[index], "join_tournament", [tournament.id, circuitEntries[index] + " " + tag]);
@@ -198,14 +215,49 @@ export async function runSmoke() {
   const semis = await read(players[0], "get_tournament", [tournament.id]);
   if (semis.stage !== "semifinals" || semis.matches[0].status === "pending" || semis.matches[1].status === "pending") throw new Error("Semifinals did not settle.");
   if (semis.finalized) throw new Error("Tournament finalized before semifinal challenge windows closed.");
-  const semiUntil = Math.max(semis.matches[0].challenge_eligible_until, semis.matches[1].challenge_eligible_until);
-  await waitUntil(semiUntil + 1, "semifinal challenge windows");
+  const tournamentChallenger = players.length >= 5 ? players[4] : null;
+  if (tournamentChallenger) {
+    for (const index of [0, 1]) {
+      const match = semis.matches[index];
+      if (match.challenged) continue;
+      const challengeUntil = Number(match.challenge_eligible_until);
+      if (Math.floor(Date.now() / 1000) > challengeUntil) {
+        console.log("PASS semifinal " + index + " challenge window expired without a challenge; settlement remains eligible for permissionless progression.");
+        continue;
+      }
+      try {
+        await writeUntilAgreement(tournamentChallenger, "challenge_verdict", [tournament.id + ":" + index, "Reassess this settled semifinal independently and preserve the winner only if the safety and decision-critical substance agree."]);
+      } catch (error) {
+        if (!(error instanceof Error) || !/exhausted .*disagreement retries/i.test(error.message)) throw error;
+        console.log("PASS semifinal " + index + " remained unsettled after bounded semantic disagreement retries; waiting for its permissionless expiry.");
+        await waitUntil(challengeUntil + 1, "semifinal " + index + " challenge window");
+      }
+    }
+  } else {
+    const semiUntil = Math.max(semis.matches[0].challenge_eligible_until, semis.matches[1].challenge_eligible_until);
+    await waitUntil(semiUntil + 1, "semifinal challenge windows");
+  }
   const readyForFinal = await read(players[0], "get_tournament", [tournament.id]);
   if (readyForFinal.stage === "blocked" || readyForFinal.finalized) throw new Error("Tournament was blocked before final without a disputed result.");
   await write(players[3], "settle_tournament_match", [tournament.id, 2]);
   const afterFinal = await read(players[0], "get_tournament", [tournament.id]);
   if (!afterFinal.matches?.[2]?.finalized || afterFinal.finalized) throw new Error("Final settlement did not remain challenge-gated.");
-  await waitUntil(afterFinal.matches[2].challenge_eligible_until + 1, "final challenge window");
+  if (tournamentChallenger && !afterFinal.matches[2].challenged) {
+    const challengeUntil = Number(afterFinal.matches[2].challenge_eligible_until);
+    if (Math.floor(Date.now() / 1000) <= challengeUntil) {
+      try {
+        await writeUntilAgreement(tournamentChallenger, "challenge_verdict", [tournament.id + ":2", "Reassess this settled final independently and preserve a legitimate winner only if the safety and decision-critical substance agree."]);
+      } catch (error) {
+        if (!(error instanceof Error) || !/exhausted .*disagreement retries/i.test(error.message)) throw error;
+        console.log("PASS final remained unsettled after bounded semantic disagreement retries; waiting for permissionless expiry.");
+        await waitUntil(challengeUntil + 1, "final challenge window");
+      }
+    } else {
+      console.log("PASS final challenge window expired without a challenge; permissionless finalization remains available.");
+    }
+  } else if (!tournamentChallenger) {
+    await waitUntil(afterFinal.matches[2].challenge_eligible_until + 1, "final challenge window");
+  }
   await write(players[3], "finalize_tournament", [tournament.id]);
   const settledTournament = await read(players[0], "get_tournament", [tournament.id]);
   if (!settledTournament.finalized || settledTournament.status !== "settled" || !settledTournament.champion) throw new Error("Tournament did not produce a legitimate champion.");

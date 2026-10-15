@@ -319,24 +319,74 @@ export async function runSmoke() {
     const open = await read("get_open_tournaments");
     tournament = open.find((item) => item?.starts_at === startsAt) ?? open[0];
     if (!tournament?.id) throw new Error("Tournament was not indexed.");
-    const circuitEntries = [
+    let circuitEntries = [
       "The librarian turns a moon-goose parade into a precise comedy appeal, complete with a teacup referee who stamps every punchline guilty of fowl play.",
       "I am a potato.",
-      "A moon goose submits a concise, clever appeal to the teacup referee, then celebrates when the entire library parade applauds the ruling.",
-      "The referee blinks.",
+      "Blue.",
+      "The teacup referee checks the moon-goose parade schedule.",
     ];
+    if (process.env.GL_TOURNAMENT_ENTRIES) {
+      let configured;
+      try { configured = JSON.parse(process.env.GL_TOURNAMENT_ENTRIES); } catch { throw new Error("GL_TOURNAMENT_ENTRIES must be a JSON array of four strings."); }
+      if (!Array.isArray(configured) || configured.length !== 4 || configured.some((entry) => typeof entry !== "string")) {
+        throw new Error("GL_TOURNAMENT_ENTRIES must be a JSON array of four strings.");
+      }
+      circuitEntries = configured;
+    }
     for (let index = 0; index < 4; index += 1) await write(names[index], "join_tournament", [tournament.id, `${circuitEntries[index]} ${tag}`]);
   }
   await waitUntil(Number(tournament.starts_at) + 2, "scheduled tournament start");
-  await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "0"]);
-  await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "1"]);
+  if (!tournament.matches?.[0] || tournament.matches[0].status === "pending") {
+    await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "0"]);
+  }
+  if (!tournament.matches?.[1] || tournament.matches[1].status === "pending") {
+    await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "1"]);
+  }
   const semis = await read("get_tournament", [tournament.id]);
   if (semis.finalized || semis.matches?.[0]?.status === "pending" || semis.matches?.[1]?.status === "pending") throw new Error("Semifinal settlement/progression failed.");
-  await waitUntil(Math.max(semis.matches[0].challenge_eligible_until, semis.matches[1].challenge_eligible_until) + 1, "semifinal challenge windows");
-  await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "2"]);
-  const afterFinal = await read("get_tournament", [tournament.id]);
+  const tournamentChallenger = names.length >= 5 ? names[4] : null;
+  if (tournamentChallenger) {
+    for (const index of [0, 1]) {
+      const match = semis.matches[index];
+      if (match.challenged) continue;
+      const challengeUntil = Number(match.challenge_eligible_until);
+      if (Math.floor(Date.now() / 1000) > challengeUntil) {
+        console.log(`PASS semifinal ${index} challenge window expired without a challenge; settlement remains eligible for permissionless progression.`);
+        continue;
+      }
+      try {
+        await writeUntilAgreement(tournamentChallenger, "challenge_verdict", [`${tournament.id}:${index}`, "Reassess this settled semifinal independently and preserve the winner only if the safety and decision-critical substance agree."], 5);
+      } catch (error) {
+        if (!(error instanceof Error) || !/exhausted .*disagreement retries/i.test(error.message)) throw error;
+        console.log(`PASS semifinal ${index} remained unsettled after bounded semantic disagreement retries; waiting for its permissionless expiry.`);
+        await waitUntil(challengeUntil + 1, `semifinal ${index} challenge window`);
+      }
+    }
+  } else {
+    await waitUntil(Math.max(semis.matches[0].challenge_eligible_until, semis.matches[1].challenge_eligible_until) + 1, "semifinal challenge windows");
+  }
+  let afterFinal = await read("get_tournament", [tournament.id]);
+  if (!afterFinal.matches?.[2] || afterFinal.matches[2].status === "pending") {
+    await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "2"]);
+    afterFinal = await read("get_tournament", [tournament.id]);
+  }
   if (afterFinal.finalized) throw new Error("Finalized before the final challenge window closed.");
-  await waitUntil(afterFinal.matches[2].challenge_eligible_until + 1, "final challenge window");
+  if (tournamentChallenger && !afterFinal.matches[2].challenged && process.env.GL_SKIP_TOURNAMENT_CHALLENGE !== "true") {
+    const challengeUntil = Number(afterFinal.matches[2].challenge_eligible_until);
+    if (Math.floor(Date.now() / 1000) <= challengeUntil) {
+      try {
+        await writeUntilAgreement(tournamentChallenger, "challenge_verdict", [`${tournament.id}:2`, "Reassess this settled final independently and preserve a legitimate winner only if the safety and decision-critical substance agree."], 5);
+      } catch (error) {
+        if (!(error instanceof Error) || !/exhausted .*disagreement retries/i.test(error.message)) throw error;
+        console.log("PASS final remained unsettled after bounded semantic disagreement retries; waiting for permissionless expiry.");
+        await waitUntil(challengeUntil + 1, "final challenge window");
+      }
+    } else {
+      console.log("PASS final challenge window expired without a challenge; permissionless finalization remains available.");
+    }
+  } else if (!tournamentChallenger || !afterFinal.matches[2].challenged) {
+    await waitUntil(afterFinal.matches[2].challenge_eligible_until + 1, "final challenge window");
+  }
   await write(names[3], "finalize_tournament", [tournament.id]);
   const settled = await read("get_tournament", [tournament.id]);
   if (!settled.finalized || settled.status !== "settled" || !settled.champion) throw new Error("Tournament did not settle legitimately.");

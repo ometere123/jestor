@@ -2,6 +2,7 @@
 
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
+import { TransactionHashVariant } from "genlayer-js/types";
 
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK_CONTRACT === "true";
 export const TARGET_CHAIN_ID = Number(process.env.NEXT_PUBLIC_GENLAYER_CHAIN_ID ?? "61999");
@@ -148,6 +149,10 @@ export async function verifyFinalizedTransaction(resultId: string, hash: string)
     const returnedId = typeof returned === "string" ? returned : undefined;
     if (returnedId !== resultId) {
       return { verified: false, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, reason: "The finalized receipt does not return the requested result identifier." };
+    }
+    const state = await client.readContract({ address, functionName: "get_verdict", args: [resultId], transactionHashVariant: TransactionHashVariant.LATEST_FINAL }) as Record<string, unknown>;
+    if (!state || state.finalized !== true) {
+      return { verified: false, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, reason: "The returned result identifier is not an authoritative finalized verdict." };
     }
     return { verified: true, hash, statusName: evidence.statusName, resultName: evidence.resultName, executionResult: evidence.executionResult, resultId: returnedId };
   } catch (error) {

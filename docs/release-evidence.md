@@ -33,14 +33,28 @@ The release candidate passed:
 
 - `genvm-lint contract/jestor_arena.py`: 3 checks passed.
 - `npm run test:direct`: 13 Direct Mode tests passed.
+- `npm run test:frontend:unit`: 6 frontend unit tests passed.
 - `npm run lint`: passed.
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed; 14 Next.js routes generated.
 - `git diff --check`: passed for the release changes.
 
+GitHub Actions run
+[`38773859807`](https://github.com/ometere123/jestor/actions/runs/38773859807)
+passed the static/build/lint/Direct Mode job on commit `ae90125`. Its
+secret-dependent Studionet job was intentionally skipped because repository
+secrets are not configured; the live evidence below was executed locally with
+five funded CLI-managed wallets, with the fifth used only as a non-participant
+challenger.
+
 The direct suite covers deterministic invariants and adversarial leader
 outputs. Direct Mode does not itself prove validator agreement; that evidence
 comes from the finalized Studionet receipts below.
+
+The receipt relationship verifier was also exercised against caption
+transaction `0x83ec2ccc2b74dc903583d5589da7a30dd98b0d1792c2b29b59f0ad0ba83cf1a9`:
+the SDK read `status=7`, `MAJORITY_AGREE`, leader `SUCCESS`, target equal to
+the deployed contract, and returned result id `2ed8cc64355237442e8ee0bd`.
 
 ## Historical candidate evidence (not production proof)
 
@@ -125,13 +139,14 @@ close.
 
 ## Final-address Studionet evidence
 
-The final release run used the address-bound deployment
-`0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` and four serial CLI-managed
-wallets (`party_a`, `walletA`, `walletB`, and `conveyance-deployer`). Every
-listed write was checked for `FINALIZED`, `MAJORITY_AGREE`, and leader
-`SUCCESS`; finalized contract rejections are explicitly marked as negative
-tests. The final tournament row is completed after the scheduled challenge
-windows close.
+The final release runs used the address-bound deployment
+`0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` and five serial CLI-managed
+wallets (`party_a`, `walletA`, `walletB`, `conveyance-deployer`, and
+`party_b`). The fifth wallet was not registered in the circuits and acted only
+as a permissionless challenger. Every listed write was checked for
+`FINALIZED`, `MAJORITY_AGREE`, and leader `SUCCESS`; finalized contract
+rejections and finalized semantic disagreements are explicitly marked as
+negative/no-mutation tests.
 
 | Lifecycle | Final deployment transaction / readback |
 | --- | --- |
@@ -161,6 +176,79 @@ reveals; the pre-reveal read returned empty entries. Its commitment payload
 included chain `61999`, the deployed contract address, the duel id, prompt,
 participant, salt, and trimmed entry.
 
+### Final-address blocked circuit
+
+The first final-address circuit intentionally used a symmetric final. A
+finalized semantic disagreement was retried without state mutation, then the
+DRAW final was finalized as blocked. It never advanced Player A and never
+created a champion:
+
+| Item | Value |
+| --- | --- |
+| Tournament | `d2cea4c4aa121c2dfb84298e` |
+| Create transaction | `0x46f9ad3e360e0c52c8fdef3e53d91704548f7d0d9304073040def84547d59558` |
+| Finalized disagreement, unchanged state | `0x34acefc88bf727a4a237743eab9179b39776f223718f1034d85a4a786acd3de` |
+| Final DRAW retry | `0x456207e5ccb95bcbc7ec9269d72eec9c7c2a221f62dabb65063767a6622f27ea` |
+| Permissionless finalization | `0xabd0d9491db0ea8bd4f451b6f0ef4a76112ea78cdcd3c8611bea6ea1019fd07c` |
+| Final readback | `status=blocked`, `stage=blocked`, `finalized=true`, `champion=null` |
+
+Two additional final-address circuits exercised the same state machine. The
+close final in `4af10aad69481587c551c758` was challenged by the fifth,
+non-participant CLI wallet and remained a blocked DRAW:
+
+| Item | Value |
+| --- | --- |
+| Tournament create | `0x62dd7970d8f7e893baf4f3336c89f17f5df5db3e1d6c66843e5af697756d3700` |
+| Final settlement (DRAW) | `0x0c51a20d42fdc87e00bdfb03c8c59aa2912d5745687604fa66d6b16e253266182` |
+| Final challenge | `0x0a6816f32bee336e7137163871c056621dff692a928affe684e5bcc38e4b7c47` |
+| Permissionless finalization | `0x45d9825e5772e3a4307fda9eaccb33fd061e324f0dab453b420faa44fe4fc302` |
+| Readback | `status=blocked`, `stage=blocked`, `finalized=true`, `champion=null` |
+
+The address-bound circuit `8565d1743f67f773a2f51cda` also recorded finalized
+semantic disagreements on three semifinal challenge submissions and a
+permissionless blocked DRAW final. The retries had no state mutation:
+
+| Item | Value |
+| --- | --- |
+| Tournament create | `0x63e586ca5f76af82ac52832347b60832fe9265e55fed80144c8feefa245ba700` |
+| Semifinal settlements | `0xa0625d32e0ea4c1ab55436825f4a4d9f2b467d7bee1e6c91bbfe5a06f510c0607`, `0x07676897c2c32b70c6d69372cd83cbfc02756daed42d1dc900470b6e0fcdbba33` |
+| Finalized disagreement retries | `0xaf7472b857f0df1da209944cf2a951824593646c67f7c7faaebe1086206d0c0b`, `0xe3e76b645e3d13da2c5508a38a5ad344ef3ccf9d4f3dd5e4508d984d6d3ef1f1`, `0x00d5c10319b01d6f183be9b41a190408cdb8aef704bea966a54a1d59ea26ffb7` |
+| Final settlement / accepted final challenge | `0x1bcb22d7e1d276f155a2a7835975917466074b807e5987787bac205d4e779b15`, `0x5436045bef2330a13ec80d558718c46e3cbfebbadf447762bc23a4fcdcca2f1b` |
+| Permissionless finalization | `0xf636eb7eaf910796cca3964f9a6f66c671bffbd55e140de44801d60cb3b3f44f` |
+| Readback | `status=blocked`, `stage=blocked`, `finalized=true`, final `DRAW`, `challenged=true`, `champion=null` |
+
+The finalized receipt for `0x00d5…26ffb7` had leader `SUCCESS` but
+`MAJORITY_DISAGREE`; the transaction returned no state-changing result. This
+is retained as evidence that a malicious or substantively inconsistent
+challenge cannot force a bracket transition.
+
+The five-wallet release run then created a high-contrast, safe-entry circuit
+`555647cd5e35c3b7f923d24b` to exercise the positive path. Its semifinal
+challenge attempts also produced finalized disagreement receipts without
+mutation, after which the scheduled bracket progressed permissionlessly. The
+final was independently judged as a decisive A win (`40/10` deterministic
+final reward), and its final challenge remained safely gated until the
+deadline; the finalization receipt and champion/career readback are recorded
+below after the window closed.
+
+| Item | Value |
+| --- | --- |
+| Tournament create | `0x748ea2c6e58b658048c732c5cdc6676e2e12f45d04da05791f04f04166441b09` |
+| Four finalized joins | `0xe8bfa3135db4377fe0c94b25bc08d36e889cadd541eecf90103ae90521d5d23e`, `0x6c4788ef0608f5519d5314ec2c87f5a13be93ea0b3a72b837eb9fe44a87f9ec6`, `0x5f7f4282dda44a5058df6835eb38107d952b6d48ed5b9f1b73b0707b48d929d9`, `0x4c0134e3dceeb700b5b1f4eac3ddab45725de799ec4f8628b7db22d46ea7758c` |
+| Semifinal settlements | `0xb7db5d6ce29ba4b76c3c586f16cde5e757df134765530d362419a4185ad5ea33`, `0x8401af2b1e432341ee9b36f83a9bcc0378566c75d9e0fafc158067da3938763a` |
+| Finalized semifinal disagreement (receipt-verified) | `0x7e44776faabfa4728bb8dc41008bcd71a2737b4f10d60d9df2d97a274a25b289` |
+| Final settlement | `0xb2994861d8c3c46f0de745792c1ae698ee64206d23194af8663cc255bf752843` |
+| Finalized final disagreement (receipt-verified) | `0xbe9e7fc3a2d49ac220b0f08cade82880219ebe8106bc3b4a4ff6e4356ea97687` |
+| Permissionless expiry finalization | `0x72b8b67d8ad75969707c256cfeebd9853469338371e6d2329bbe2224d99dccb2` |
+| Final readback | `status=settled`, `stage=complete`, `finalized=true`, champion `0xac3ac69dc0bde389256dd6748c75817ead9286d9`, final `A`, final deltas `40/10` |
+| Champion profile/career | balance `165`, `tournament_wins=1`, `tournament_finalists=1`, `tournament_match_wins=5`, badges include `ARENA_CHAMPION`, season `691` points `5` |
+| Sorted leaderboard / season standings | champion wallet ranked first at `165`; season `691` ranked champion at `5` points |
+
+The `0x72b8…dccb2` receipt was independently read as `status=7`,
+`MAJORITY_AGREE`, leader `SUCCESS`, and returned the tournament identifier.
+The final state, career, and leaderboard were then read through
+`LATEST_FINAL`; no UI or submitted hash was used as evidence.
+
 ## Production frontend
 
 The existing Vercel project is `delealufejoel-4184s-projects/jestor`.
@@ -175,7 +263,7 @@ the served JavaScript contained the final contract address, Studionet RPC,
 chain `61999`, and injected `window.ethereum` wallet logic. The homepage,
 duels, circuit, and public verdict routes rendered in the in-app browser. The
 Chrome extension provider was unavailable in this audit session, so no browser
-transaction was claimed as evidence; the four-wallet CLI run below is the
+transaction was claimed as evidence; the five-wallet CLI runs below are the
 authoritative live write/readback evidence.
 
 ## Historical state and limitations

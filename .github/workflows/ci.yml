@@ -44,6 +44,11 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      - name: Smoke runner syntax
+        run: |
+          node --check scripts/cli-wallet-smoke.mjs
+          node --check scripts/arena-circuit-smoke.mjs
+
       - name: GenVM lint
         run: genvm-lint contract/jestor_arena.py
 
