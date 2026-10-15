@@ -187,6 +187,13 @@ def test_untrusted_data_cannot_escape_judgment_markers_and_challenge_shape_is_bo
     duel_wrong_shape = dict(submission_keep, result_kind="duel", new_winner="A", new_a_delta=20, new_b_delta=0)
     assert arena._valid("challenge", submission_keep) is True
     assert arena._valid("challenge", duel_wrong_shape) is False
+    submission = {"type": "roast", "current_accepted": True, "balance_delta": 30, "verdict": {"safety_class": "SAFE"}}
+    assert arena._challenge_shape_matches("submission", submission, submission_keep | {"new_delta": 30}) is True
+    assert arena._challenge_shape_matches("submission", submission, submission_keep | {"new_delta": 80}) is False
+    tournament = {"index": 0, "verdict": {"winner": "A", "a_delta": 20, "b_delta": 5, "safety_class": "SAFE"}}
+    tournament_keep = {"decision": "KEEP", "new_delta": 0, "new_a_delta": 20, "new_b_delta": 5, "new_winner": "A", "new_safety_class": "SAFE", "new_allowed": True, "new_valid": True}
+    assert arena._challenge_shape_matches("tournament", tournament, tournament_keep | {"reason": "keep"}) is True
+    assert arena._challenge_shape_matches("tournament", tournament, tournament_keep | {"new_a_delta": 60, "reason": "forged"}) is False
 
 
 def test_challenge_is_substantive_idempotent_and_preserves_original_history(direct_vm, direct_deploy, direct_accounts):

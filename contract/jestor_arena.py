@@ -764,6 +764,32 @@ not transformative. The allowed decision must follow the score thresholds."""
         return ("", {}, "", -1)
 
     def _challenge_task(self, kind: str, result: dict, challenge_text: str) -> str:
+        if kind == "submission":
+            shape_rules = """This result is a single-player submission. For every KEEP or
+ADJUST response, set result_kind to submission, new_winner to DRAW, and
+new_a_delta and new_b_delta to 0. Set new_valid and new_allowed to true only
+when the reassessed submission is safe and eligible; otherwise set both false,
+new_safety_class to an unsafe class, and new_delta to 0. For a safe ADJUST,
+new_delta is the proposed deterministic single-player point delta. For KEEP,
+copy the existing accepted/safety decision and deterministic delta exactly into
+the corresponding new_* fields."""
+        elif kind == "tournament":
+            reward_winner = 40 if int(result.get("index", -1)) == 2 else 20
+            reward_loser = 10 if int(result.get("index", -1)) == 2 else 5
+            shape_rules = f"""This result is an Arena Circuit tournament match. Set new_delta to 0.
+For winner A, use new_a_delta {reward_winner} and new_b_delta {reward_loser};
+for winner B, use new_a_delta {reward_loser} and new_b_delta {reward_winner};
+for DRAW or NO_CONTEST use both deltas 0. An unsafe reassessment must be
+NO_CONTEST with both deltas 0, new_allowed false, and new_valid false. For
+KEEP, copy the existing winner, safety, and requested a_delta/b_delta exactly
+into the corresponding new_* fields."""
+        else:
+            shape_rules = """This result is a competitive match. Set new_delta to 0.
+For winner A, use new_a_delta 60 and new_b_delta 10; for winner B, use
+new_a_delta 10 and new_b_delta 60; for DRAW or NO_CONTEST use both deltas 0.
+An unsafe reassessment must be NO_CONTEST with both deltas 0, new_allowed false,
+and new_valid false. For KEEP, copy the existing winner, safety, and requested
+deterministic deltas exactly into the corresponding new_* fields."""
         return f"""Independently rejudge a finalized Jestor result.
 RESULT KIND DATA <DATA>{self._data(kind)}</DATA>
 ORIGINAL RESULT DATA <DATA>{self._data(self._dumps(result))}</DATA>
@@ -774,7 +800,46 @@ new_delta -25..80, new_a_delta/new_b_delta 0-60, new_winner
 A/B/DRAW/NO_CONTEST, new_safety_class SAFE/UNSAFE/TOO_MEAN/TARGETED_ABUSE/
 HATE/SEXUAL/SELF_HARM/SPAM, new_allowed boolean, new_valid boolean, and reason.
 KEEP preserves the current settlement. ADJUST changes only the relevant
-deterministic effect. BLOCK makes the result unsafe/no-contest and zero."""
+deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
+{shape_rules}"""
+
+    def _competitive_reward_caps(self, kind: str, result: dict) -> tuple:
+        if kind == "tournament":
+            return (40, 10) if int(result.get("index", -1)) == 2 else (20, 5)
+        return self.DUEL_WIN_MAX, self.DUEL_LOSE_MAX
+
+    def _challenge_shape_matches(self, kind: str, result: dict, verdict: dict) -> bool:
+        if kind == "submission":
+            accepted = bool(result.get("current_accepted"))
+            if verdict.get("new_a_delta") != 0 or verdict.get("new_b_delta") != 0:
+                return False
+            if verdict.get("decision") == "KEEP":
+                if verdict.get("new_winner") != "DRAW":
+                    return False
+                current = result.get("verdict", {})
+                return verdict.get("new_safety_class") == current.get("safety_class", "SAFE") and verdict.get("new_allowed") == accepted and verdict.get("new_valid") == accepted and verdict.get("new_delta") == int(result.get("balance_delta", 0))
+            if verdict.get("decision") == "BLOCK":
+                return verdict.get("new_winner") == "NO_CONTEST" and verdict.get("new_safety_class") != "SAFE" and not verdict.get("new_allowed") and not verdict.get("new_valid") and verdict.get("new_delta") == 0
+            if verdict.get("new_winner") != "DRAW":
+                return False
+            if verdict.get("new_safety_class") != "SAFE":
+                return verdict.get("new_allowed") is False and verdict.get("new_valid") is False and verdict.get("new_delta") == 0
+            maximum, minimum = self._submission_limits(result.get("type", "caption"))
+            return verdict.get("new_allowed") is True and verdict.get("new_valid") is True and minimum <= verdict.get("new_delta", -1) <= maximum
+        cap_a, cap_b = self._competitive_reward_caps(kind, result)
+        if verdict.get("new_delta") != 0:
+            return False
+        if verdict.get("decision") == "KEEP":
+            current = result.get("verdict", {})
+            safe = current.get("safety_class") == "SAFE"
+            return verdict.get("new_winner") == current.get("winner", "NO_CONTEST") and verdict.get("new_safety_class") == current.get("safety_class", "SAFE") and verdict.get("new_a_delta") == int(current.get("a_delta", 0)) and verdict.get("new_b_delta") == int(current.get("b_delta", 0)) and verdict.get("new_allowed") == safe and verdict.get("new_valid") == (current.get("winner") != "NO_CONTEST")
+        if verdict.get("decision") == "BLOCK" or verdict.get("new_safety_class") != "SAFE":
+            return verdict.get("new_winner") == "NO_CONTEST" and verdict.get("new_a_delta") == 0 and verdict.get("new_b_delta") == 0 and verdict.get("new_allowed") is False and verdict.get("new_valid") is False
+        if verdict.get("new_allowed") is not True or verdict.get("new_valid") is not True:
+            return False
+        winner = verdict.get("new_winner")
+        expected = (cap_a, cap_b) if winner == "A" else (cap_b, cap_a) if winner == "B" else (0, 0)
+        return (verdict.get("new_a_delta"), verdict.get("new_b_delta")) == expected and winner in {"A", "B", "DRAW"}
 
     def _submission_limits(self, sub_type: str) -> tuple:
         if sub_type == "chaos": return self.CHAOS_MAX, self.CHAOS_MIN
@@ -793,6 +858,8 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero."""
         if self._now() > int(result.get("challenge_eligible_until", 0)): raise gl.vm.UserError("[EXPECTED] Challenge window expired.")
         self._cooldown(addr, "challenge", 30)
         verdict = self._judge("challenge", self._challenge_task(kind, result, clean))
+        if not self._challenge_shape_matches(kind, result, verdict):
+            raise gl.vm.UserError("[EXPECTED] Challenge judgment failed deterministic shape validation.")
         changes = {}
         if kind == "submission":
             old_delta = int(result.get("balance_delta", 0)); old_accepted = bool(result.get("current_accepted")); current = result.get("verdict", {})
@@ -818,9 +885,13 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero."""
             elif verdict.get("decision") == "BLOCK":
                 new_a, new_b, new_winner, new_safety = 0, 0, "NO_CONTEST", "UNSAFE"
             else:
-                new_a, new_b = int(verdict.get("new_a_delta", old_a)), int(verdict.get("new_b_delta", old_b)); new_safety = verdict.get("new_safety_class", old_verdict.get("safety_class", "SAFE")); new_winner = verdict.get("new_winner", old_winner)
-                if new_safety != "SAFE": new_a, new_b, new_winner = 0, 0, "NO_CONTEST"
-            a = result.get("player_a", ""); b = result.get("player_b", ""); actual_a = self._correct_effect(a, old_a, new_a, self.DUEL_WIN_MAX, 0); actual_b = self._correct_effect(b, old_b, new_b, self.DUEL_WIN_MAX, 0)
+                new_safety = verdict.get("new_safety_class", old_verdict.get("safety_class", "SAFE")); new_winner = verdict.get("new_winner", old_winner)
+                if new_safety != "SAFE":
+                    new_a, new_b, new_winner = 0, 0, "NO_CONTEST"
+                else:
+                    cap_a, cap_b = self._competitive_reward_caps(kind, result)
+                    new_a, new_b = (cap_a, cap_b) if new_winner == "A" else (cap_b, cap_a) if new_winner == "B" else (0, 0)
+            a = result.get("player_a", ""); b = result.get("player_b", ""); cap_a, cap_b = self._competitive_reward_caps(kind, result); actual_a = self._correct_effect(a, old_a, new_a, cap_a, 0); actual_b = self._correct_effect(b, old_b, new_b, cap_b, 0)
             if old_winner != new_winner:
                 if kind == "duel": self._duel_profile_shift(result, old_winner, -1); self._duel_profile_shift(result, new_winner, 1)
                 if kind == "tournament": self._tournament_profile_shift(result, old_winner, -1); self._tournament_profile_shift(result, new_winner, 1)
@@ -887,10 +958,16 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero."""
 
     def _tournament_match(self, t: dict, match: dict, final: bool) -> None:
         verdict = self._judge("duel", self._duel_task(t["prompt_text"], match["entry_a"], match["entry_b"])); winner = verdict["winner"]; reward_winner = 40 if final else 20; reward_loser = 10 if final else 5
-        if winner == "A": da = self._apply(match["player_a"], reward_winner, reward_winner); db = self._apply(match["player_b"], reward_loser, reward_loser)
-        elif winner == "B": da = self._apply(match["player_a"], reward_loser, reward_loser); db = self._apply(match["player_b"], reward_winner, reward_winner)
-        else: da, db = 0, 0
-        verdict["winner"] = winner; verdict["actual_a_delta"] = da; verdict["actual_b_delta"] = db; match["verdict"] = verdict; match["original_verdict"] = self._clone(verdict); match["status"] = "resolved" if winner in {"A", "B"} else "blocked"; match["settled"] = True; match["finalized"] = True; match["challenge_eligible_until"] = self._now() + self.CHALLENGE_WINDOW
+        if winner == "A":
+            requested_a, requested_b = reward_winner, reward_loser
+            da = self._apply(match["player_a"], requested_a, reward_winner); db = self._apply(match["player_b"], requested_b, reward_loser)
+        elif winner == "B":
+            requested_a, requested_b = reward_loser, reward_winner
+            da = self._apply(match["player_a"], requested_a, reward_loser); db = self._apply(match["player_b"], requested_b, reward_winner)
+        else:
+            requested_a, requested_b = 0, 0
+            da, db = 0, 0
+        verdict["winner"] = winner; verdict["a_delta"] = requested_a; verdict["b_delta"] = requested_b; verdict["actual_a_delta"] = da; verdict["actual_b_delta"] = db; match["verdict"] = verdict; match["original_verdict"] = self._clone(verdict); match["status"] = "resolved" if winner in {"A", "B"} else "blocked"; match["settled"] = True; match["finalized"] = True; match["challenge_eligible_until"] = self._now() + self.CHALLENGE_WINDOW
         self._record_history(match["id"], "initial", match["original_verdict"], {match["player_a"]: da, match["player_b"]: db}); self._inc("finalized_verdicts"); self._tournament_profile_shift(match, winner, 1)
         for who, delta in [(match["player_a"], da), (match["player_b"], db)]:
             p = self._profile(who); p["verdict_count"] = int(p.get("verdict_count", 0)) + 1; self._save_profile(who, p); self._career_event(who, "tournament_match", match["id"], delta)

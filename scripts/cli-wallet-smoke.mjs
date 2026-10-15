@@ -33,8 +33,14 @@ const negativeTransactions = [];
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function cli(args) {
+  const invokeArgs = process.platform === "win32"
+    ? args.map((value) => {
+      const text = String(value);
+      return /[\s"]/.test(text) ? `"${text.replace(/(["\\])/g, "\\$1")}"` : text;
+    })
+    : args;
   try {
-    const result = await run(CLI, args, { cwd: process.cwd(), windowsHide: true, shell: process.platform === "win32", maxBuffer: 16 * 1024 * 1024 });
+    const result = await run(CLI, invokeArgs, { cwd: process.cwd(), windowsHide: true, shell: process.platform === "win32", maxBuffer: 16 * 1024 * 1024 });
     return result.stdout + result.stderr;
   } catch (error) {
     const stdout = error?.stdout ?? "";
@@ -65,9 +71,10 @@ function extractHash(output) {
 function receiptEvidence(output) {
   const finalized = /status_name:\s*['"]FINALIZED['"]|status:\s*7\b/i.test(output);
   const majority = /result_name:\s*['"]MAJORITY_AGREE['"]|result:\s*6\b/i.test(output);
-  const success = /execution_result:\s*['"]SUCCESS['"]/i.test(output);
-  const error = /execution_result:\s*['"](?:ERROR|FINISHED_WITH_ERROR)['"]|error_description:\s*['"](?!['"])/i.test(output);
-  return { finalized, majority, success, error };
+  const leaderExecution = output.match(/execution_result:\s*['"](SUCCESS|ERROR|FINISHED_WITH_ERROR)['"]/i)?.[1]?.toUpperCase();
+  const success = leaderExecution === "SUCCESS";
+  const error = leaderExecution === "ERROR" || leaderExecution === "FINISHED_WITH_ERROR";
+  return { finalized, majority, success, error, leaderExecution };
 }
 
 async function write(accountName, method, args = [], options = {}) {
@@ -83,7 +90,8 @@ async function write(accountName, method, args = [], options = {}) {
     console.log(`PASS expected rejection ${method} ${hash}`);
     return { hash, receipt, evidence };
   }
-  if (!evidence.success || evidence.error) throw new Error(`${method} finalized with contract execution failure.`);
+  if (options.allowError && evidence.error) return { hash, receipt, evidence, contractError: true };
+  if (!evidence.success || evidence.error) throw new Error(`${method} finalized with contract execution failure (${hash}; leader=${evidence.leaderExecution ?? "unknown"}).`);
   transactions.push({ method, hash, finality: "FINALIZED", consensus: "MAJORITY_AGREE", execution: "SUCCESS" });
   console.log(`PASS ${method} ${hash}`);
   return { hash, receipt, evidence };
@@ -124,11 +132,22 @@ export async function runSmoke() {
   }
 
   const tag = randomBytes(8).toString("hex");
-  const promptText = `A ${tag} librarian teaches moon geese to audit a backwards parade of singing teacups.`;
-  await write(names[0], "create_prompt", [promptText]);
-  const prompts = await read("get_active_prompts");
-  const prompt = prompts.find((item) => item?.text === promptText);
-  if (!prompt?.id || prompt.moderation !== "APPROVED") throw new Error("Prompt approval/readback failed.");
+  let prompt;
+  if (process.env.GL_PROMPT_ID) {
+    prompt = await read("get_prompt", [process.env.GL_PROMPT_ID]);
+  } else {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const promptText = `A ${tag}-${attempt} librarian watches a parade of moon geese argue with a teacup referee.`;
+      const promptWrite = await write(names[0], "create_prompt", [promptText], { allowError: true });
+      if (!promptWrite.contractError) {
+        const prompts = await read("get_active_prompts");
+        prompt = prompts.find((item) => item?.text === promptText);
+        if (prompt?.id && prompt.moderation === "APPROVED") break;
+      }
+      if (attempt < 2) await waitUntil(Math.floor(Date.now() / 1000) + 31, "prompt moderation retry cooldown");
+    }
+  }
+  if (!prompt?.id || prompt.moderation !== "APPROVED" || prompt.active !== true) throw new Error("Prompt approval/readback failed after bounded retries or override validation.");
   await write(names[0], "submit_caption", ["not-a-prompt", "This invalid prompt must be rejected."], { expectError: true });
   const captionText = "The moon goose filed the punchline before the teacup referee could object.";
   await write(names[0], "submit_caption", [prompt.id, captionText]);
