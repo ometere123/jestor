@@ -1,21 +1,11 @@
 "use client";
 
-import type { CalldataEncodable, Hash } from "genlayer-js/types";
-import { getReadClient, getWriteClient, getContractAddress, USE_MOCK } from "./client";
+import type { CalldataEncodable } from "genlayer-js/types";
+import { sha256, toBytes } from "viem";
+import { getContractAddress, getReadClient, getWriteClient, USE_MOCK, extractVerdictFromReceipt, extractReturnValueFromReceipt, receiptEvidence, type ReceiptEvidence } from "./client";
 import { mockContract } from "../jestora/mockContract";
-import type {
-  PlayerProfile,
-  Submission,
-  Duel,
-  Prompt,
-  ChaosEvent,
-  LeaderboardEntry,
-  ProtocolStats,
-} from "./types";
+import type { Career, ChaosEvent, Duel, LeaderboardEntry, PlayerProfile, Prompt, ProtocolStats, Submission, Tournament } from "./types";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 type Arg = CalldataEncodable;
 
 export interface WriteResult {
@@ -23,241 +13,107 @@ export interface WriteResult {
   verdict: Record<string, unknown> | null;
   rawVerdict: unknown | null;
   returnValue: unknown | null;
+  evidence: ReceiptEvidence;
+  resultId?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Verdict extraction - parse from leader_receipt eq_outputs (non-det result)
-// ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractReturnValueFromReceipt(receipt: any): unknown | null {
-  try {
-    const lr = receipt?.consensus_data?.leader_receipt?.[0];
-    if (!lr) return null;
-    // Deterministic return values come in lr.result
-    if (lr.result !== undefined && lr.result !== null && lr.result !== "") return lr.result;
-    // Also check eq_outputs for scalar values
-    const eq = lr.eq_outputs;
-    if (eq && typeof eq === "object") {
-      for (const v of Object.values(eq)) {
-        if (typeof v === "string" || typeof v === "number") return v;
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function repairLooseJson(raw: string): string {
-  let repaired = raw.trim();
-  repaired = repaired.replace(/,\s*([}\]])/g, "$1");
-  repaired = repaired.replace(/(:\s*-?\d+(?:\.\d+)?)(?=\s*")/g, "$1,");
-  repaired = repaired.replace(/(:\s*true|:\s*false|:\s*null)(?=\s*")/g, "$1,");
-  repaired = repaired.replace(/(")(?=\s*")/g, '$1,');
-  return repaired;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractVerdictFromReceipt(receipt: any): Record<string, unknown> | null {
-  try {
-    const lr = receipt?.consensus_data?.leader_receipt?.[0];
-    if (!lr) return null;
-
-    const eq = lr.eq_outputs;
-    console.debug("[verdict] eq_outputs:", JSON.stringify(eq));
-
-    if (eq && typeof eq === "object") {
-      for (const v of Object.values(eq)) {
-        // Already a parsed object
-        if (v && typeof v === "object" && !Array.isArray(v)) {
-          return v as Record<string, unknown>;
-        }
-        // String - try JSON.parse, also try fixing missing commas
-        if (typeof v === "string") {
-          const attempts = [
-            v,
-            repairLooseJson(v),
-            // GenLayer Studio display strips commas between values, add them back
-            v.replace(/("|\d|true|false|null)"/g, '$1,"'),
-            v.replace(/("|\d|true|false|null)(\s*")/g, '$1,$2'),
-          ];
-          for (const attempt of attempts) {
-            try {
-              const parsed = JSON.parse(attempt);
-              if (parsed && typeof parsed === "object") return parsed;
-            } catch { /* keep trying */ }
-          }
-          console.debug("[verdict] failed to parse eq string:", v);
-        }
-      }
-    }
-
-    // Fallback: result field
-    if (typeof lr.result === "string" && lr.result.startsWith("{")) {
-      try { return JSON.parse(lr.result); } catch { /* ignore */ }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Read helper
-// ---------------------------------------------------------------------------
 async function callRead(method: string, args: Arg[] = []): Promise<unknown> {
   if (USE_MOCK) return mockContract.read(method, args);
   const client = getReadClient();
   const address = getContractAddress();
-  if (!address) throw new Error("Contract address not set. Check NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS.");
-  return client.readContract({
-    address,
-    functionName: method,
-    args,
-  });
+  if (!address) throw new Error("Contract address is not configured.");
+  return client.readContract({ address, functionName: method, args });
 }
 
-// ---------------------------------------------------------------------------
-// Write helper - signs with MetaMask, waits for consensus, extracts verdict
-// ---------------------------------------------------------------------------
-async function callWrite(
-  _senderAddress: string,
-  method: string,
-  args: Arg[] = []
-): Promise<WriteResult> {
+async function callWrite(sender: string, method: string, args: Arg[] = []): Promise<WriteResult> {
   if (USE_MOCK) {
-    const hash = await mockContract.write(method, args, _senderAddress);
-    return { hash, verdict: null, rawVerdict: null, returnValue: null };
+    const hash = await mockContract.write(method, args, sender);
+    return { hash, verdict: null, rawVerdict: null, returnValue: null, evidence: { finality: "finalized", executionResult: "SUCCESS" } };
   }
-
   const writeClient = await getWriteClient();
-  const readClient = getReadClient();
+  const connected = String(writeClient.account?.address ?? "").toLowerCase();
+  if (connected !== sender.toLowerCase()) throw new Error("Connected wallet changed. Reconnect and retry.");
   const address = getContractAddress();
-  if (!address) throw new Error("Contract address not set.");
-
-  const hash = await writeClient.writeContract({
-    address,
-    functionName: method,
-    args,
-    value: BigInt(0),
-  });
-
-  // Use the read client (GenLayer-native account) to wait for the receipt -
-  // it returns the full GenLayer receipt including consensus_data + eq_outputs.
-  // The MetaMask write client returns a standard ETH receipt without those fields.
-  const receipt = await readClient.waitForTransactionReceipt({
-    hash: hash as Hash,
-    retries: 60,
-    interval: 5000,
-  });
-
-  const verdict = extractVerdictFromReceipt(receipt);
-  const rawVerdict = receipt?.consensus_data?.leader_receipt?.[0]?.eq_outputs ?? null;
+  if (!address) throw new Error("Contract address is not configured.");
+  const hash = await writeClient.writeContract({ address, functionName: method, args, value: BigInt(0) });
+  const readClient = getReadClient();
+  // FINALIZED is required; ACCEPTED is not enough evidence that state settled.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const receipt = await (readClient.waitForTransactionReceipt as any)({ hash, status: "FINALIZED", retries: 180, interval: 5000, fullTransaction: true });
+  const evidence = receiptEvidence(receipt);
+  if (evidence.executionResult === "ERROR" || evidence.executionResult === "FINISHED_WITH_ERROR") throw new Error(evidence.stderr || `Contract execution failed for ${hash}.`);
+  if (evidence.resultName === "MAJORITY_DISAGREE") throw new Error(`Independent validators did not reach majority agreement for ${hash}.`);
   const returnValue = extractReturnValueFromReceipt(receipt);
-  return { hash: hash as string, verdict, rawVerdict, returnValue };
+  return { hash: String(hash), verdict: extractVerdictFromReceipt(receipt), rawVerdict: receipt?.consensus_data?.leader_receipt?.[0]?.eq_outputs ?? null, returnValue, resultId: typeof returnValue === "string" && returnValue ? returnValue : undefined, evidence };
 }
 
-// ---------------------------------------------------------------------------
-// Write methods
-// ---------------------------------------------------------------------------
-export async function createProfile(sender: string, alias: string): Promise<WriteResult> {
-  return callWrite(sender, "create_profile", [alias]);
+export async function createProfile(sender: string, alias: string) { return callWrite(sender, "create_profile", [alias]); }
+export async function createPrompt(sender: string, text: string) { return callWrite(sender, "create_prompt", [text]); }
+export async function submitCaption(sender: string, promptId: string, caption: string) { return callWrite(sender, "submit_caption", [promptId, caption]); }
+export async function submitRoastSelf(sender: string, promptId: string, text: string) { return callWrite(sender, "submit_roast_self", [promptId, text]); }
+export async function invokeChaosAction(sender: string, promptId: string, text: string) { return callWrite(sender, "invoke_chaos_action", [promptId, text]); }
+export async function submitRemix(sender: string, promptId: string, sourceId: string, text: string) { return callWrite(sender, "submit_remix", [promptId, sourceId, text]); }
+
+function randomSalt(): string {
+  if (typeof window === "undefined") throw new Error("Duel commits require a browser wallet.");
+  const bytes = new Uint8Array(24); crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export async function submitCaption(sender: string, roundId: string, caption: string): Promise<WriteResult> {
-  return callWrite(sender, "submit_caption", [roundId, caption]);
-}
-
-export async function submitRoastSelf(sender: string, text: string): Promise<WriteResult> {
-  return callWrite(sender, "submit_roast_self", [text]);
-}
-
-export async function invokeChaosAction(sender: string, actionText: string): Promise<WriteResult> {
-  return callWrite(sender, "invoke_chaos_action", [actionText]);
+function duelCommitment(promptId: string, address: string, entry: string, salt: string): string {
+  return sha256(toBytes(`JESTOR-DUEL-V1|${promptId}|${address.toLowerCase()}|${salt}|${entry.trim()}`)).slice(2);
 }
 
 export async function startDuel(sender: string, promptId: string, entry: string): Promise<WriteResult> {
-  return callWrite(sender, "start_duel", [promptId, entry]);
+  // The first transaction contains only the salted, domain-separated commitment.
+  // The reveal is a separate finalized transaction and is the only point where
+  // the entry becomes readable to the contract.
+  const salt = randomSalt();
+  const commitment = duelCommitment(promptId, sender, entry, salt);
+  const start = await callWrite(sender, "start_duel", [promptId, commitment]);
+  const duelId = await getLatestDuelId(sender);
+  if (!duelId) return start;
+  const reveal = await callWrite(sender, "reveal_duel_entry", [duelId, entry, salt]);
+  return { ...reveal, resultId: duelId };
 }
 
 export async function joinDuel(sender: string, duelId: string, entry: string): Promise<WriteResult> {
-  return callWrite(sender, "join_duel", [duelId, entry]);
+  const duel = await getDuel(duelId);
+  if (!duel) throw new Error("Duel not found.");
+  const salt = randomSalt();
+  const commitment = duelCommitment(duel.prompt_id, sender, entry, salt);
+  await callWrite(sender, "join_duel", [duelId, commitment]);
+  const reveal = await callWrite(sender, "reveal_duel_entry", [duelId, entry, salt]);
+  return { ...reveal, resultId: duelId };
 }
 
-export async function resolveDuel(sender: string, duelId: string): Promise<WriteResult> {
-  return callWrite(sender, "resolve_duel", [duelId]);
-}
+export async function resolveDuel(sender: string, duelId: string) { return callWrite(sender, "resolve_duel", [duelId]); }
+export async function cancelDuel(sender: string, duelId: string) { return callWrite(sender, "cancel_duel", [duelId]); }
+export async function challengeVerdict(sender: string, resultId: string, text: string) { return callWrite(sender, "challenge_verdict", [resultId, text]); }
+export async function recordTransactionHash(sender: string, resultId: string, hash: string) { return callWrite(sender, "record_transaction_hash", [resultId, hash]); }
+export async function createTournament(sender: string, promptId: string, startsAt: number) { return callWrite(sender, "create_tournament", [promptId, startsAt]); }
+export async function joinTournament(sender: string, tournamentId: string, entry: string) { return callWrite(sender, "join_tournament", [tournamentId, entry]); }
+export async function settleTournamentMatch(sender: string, tournamentId: string, matchIndex: number) { return callWrite(sender, "settle_tournament_match", [tournamentId, matchIndex]); }
 
-export async function createPrompt(sender: string, promptText: string): Promise<WriteResult> {
-  return callWrite(sender, "create_prompt", [promptText]);
-}
-
-// ---------------------------------------------------------------------------
-// View methods
-// ---------------------------------------------------------------------------
 export async function getProfile(address: string): Promise<PlayerProfile | null> {
-  // Try checksummed first, then lowercase - contract stores via str(gl.message.sender_address)
-  // which may be lowercase depending on the GenLayer runtime version.
-  for (const addr of [address, address.toLowerCase()]) {
-    const result = await callRead("get_profile", [addr]);
-    if (result && Object.keys(result as object).length > 0) return result as PlayerProfile;
-  }
-  return null;
+  const result = await callRead("get_profile", [address.toLowerCase()]);
+  return result && Object.keys(result as object).length ? result as PlayerProfile : null;
 }
-
-export async function getBalance(address: string): Promise<number> {
-  const result = await callRead("get_balance", [address.toLowerCase()]);
-  return Number(result ?? 0);
-}
-
-export async function getSubmission(submissionId: string): Promise<Submission | null> {
-  const result = await callRead("get_submission", [submissionId]);
-  if (!result || Object.keys(result as object).length === 0) return null;
-  return result as Submission;
-}
-
-export async function getOpenDuels(): Promise<Duel[]> {
-  const result = await callRead("get_open_duels", []);
-  return (result as Duel[]) ?? [];
-}
-
-export async function getAllDuels(): Promise<Duel[]> {
-  const result = await callRead("get_all_duels", []);
-  return (result as Duel[]) ?? [];
-}
-
-export async function getLatestDuelId(address: string): Promise<string | null> {
-  const result = await callRead("get_latest_duel_id", [address.toLowerCase()]);
-  return (typeof result === "string" && result.length > 0) ? result : null;
-}
-
-export async function getDuel(duelId: string): Promise<Duel | null> {
-  const result = await callRead("get_duel", [duelId]);
-  if (!result || Object.keys(result as object).length === 0) return null;
-  return result as Duel;
-}
-
-export async function getActivePrompts(): Promise<Prompt[]> {
-  const result = await callRead("get_active_prompts", []);
-  return (result as Prompt[]) ?? [];
-}
-
-export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
-  const result = await callRead("get_leaderboard", []);
-  return (result as LeaderboardEntry[]) ?? [];
-}
-
-export async function getChaosFeed(limit = 20): Promise<ChaosEvent[]> {
-  const result = await callRead("get_chaos_feed", [limit]);
-  return (result as ChaosEvent[]) ?? [];
-}
-
-export async function getProtocolStats(): Promise<ProtocolStats> {
-  const result = await callRead("get_protocol_stats", []);
-  return (result as ProtocolStats) ?? {
-    total_submissions: 0,
-    total_duels: 0,
-    total_chaos_actions: 0,
-    total_profiles: 0,
-  };
-}
+export async function getBalance(address: string): Promise<number> { return Number(await callRead("get_balance", [address.toLowerCase()]) ?? 0); }
+export async function getSubmission(id: string): Promise<Submission | null> { const result = await callRead("get_submission", [id]); return result && Object.keys(result as object).length ? result as Submission : null; }
+export async function getRecentSubmissions(promptId: string, limit = 20): Promise<Submission[]> { return (await callRead("get_recent_submissions", [promptId, limit])) as Submission[] ?? []; }
+export async function getDuel(id: string): Promise<Duel | null> { const result = await callRead("get_duel", [id]); return result && Object.keys(result as object).length ? result as Duel : null; }
+export async function getLatestDuelId(address: string): Promise<string | null> { const result = await callRead("get_latest_duel_id", [address.toLowerCase()]); return typeof result === "string" && result ? result : null; }
+export async function getLatestSubmissionId(address: string): Promise<string | null> { const result = await callRead("get_latest_submission_id", [address.toLowerCase()]); return typeof result === "string" && result ? result : null; }
+export async function getOpenDuels(): Promise<Duel[]> { return (await callRead("get_open_duels")) as Duel[] ?? []; }
+export async function getAllDuels(): Promise<Duel[]> { return (await callRead("get_all_duels")) as Duel[] ?? []; }
+export async function getActivePrompts(): Promise<Prompt[]> { return (await callRead("get_active_prompts")) as Prompt[] ?? []; }
+export async function getPrompt(id: string): Promise<Prompt | null> { const result = await callRead("get_prompt", [id]); return result && Object.keys(result as object).length ? result as Prompt : null; }
+export async function getLeaderboard(): Promise<LeaderboardEntry[]> { return (await callRead("get_leaderboard")) as LeaderboardEntry[] ?? []; }
+export async function getChaosFeed(limit = 20): Promise<ChaosEvent[]> { return (await callRead("get_chaos_feed", [limit])) as ChaosEvent[] ?? []; }
+export async function getProtocolStats(): Promise<ProtocolStats> { return (await callRead("get_protocol_stats")) as ProtocolStats; }
+export async function getVerdict(id: string): Promise<Record<string, unknown> | null> { const result = await callRead("get_verdict", [id]); return result && Object.keys(result as object).length ? result as Record<string, unknown> : null; }
+export async function getVerdictHistory(id: string, limit = 10) { return (await callRead("get_verdict_history", [id, limit])) as unknown[] ?? []; }
+export async function getCareer(address: string): Promise<Career | null> { const result = await callRead("get_career", [address.toLowerCase()]); return result && Object.keys(result as object).length ? result as Career : null; }
+export async function getSeasonStandings(season: string, limit = 50) { return (await callRead("get_season_standings", [season, limit])) as unknown[] ?? []; }
+export async function getOpenTournaments(): Promise<Tournament[]> { return (await callRead("get_open_tournaments")) as Tournament[] ?? []; }

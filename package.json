@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:direct": "python -m pytest tests/direct -q",
+    "test:frontend": "npm run lint && npx tsc --noEmit --pretty false && npm run build"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -28,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "genlayer": "0.39.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

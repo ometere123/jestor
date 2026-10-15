@@ -9,10 +9,10 @@ import ConsensusTrace from "@/components/console/ConsensusTrace";
 import StructuredVerdict from "@/components/console/StructuredVerdict";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { invokeChaosAction, getProfile } from "@/lib/genlayer/contract";
+import { invokeChaosAction, getActivePrompts, getProfile } from "@/lib/genlayer/contract";
 import { logAction, saveLastVerdict, getTraces } from "@/lib/jestora/localCache";
 import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
-import type { ChaosVerdict, ConsoleTrace } from "@/lib/genlayer/types";
+import type { ChaosVerdict, ConsoleTrace, Prompt } from "@/lib/genlayer/types";
 
 const LAST_CHAOS_KEY = "jestor_last_chaos_day";
 
@@ -27,6 +27,9 @@ export default function ChaosLabPage() {
   const [hasUsedToday, setHasUsedToday] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [txStatus, setTxStatus] = useState("");
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+
+  useEffect(() => { void getActivePrompts().then(setPrompts).catch(() => setPrompts([])); }, []);
 
   useEffect(() => {
     if (!address) return;
@@ -39,7 +42,7 @@ export default function ChaosLabPage() {
   }, [address]);
 
   const handleSubmit = async (text: string) => {
-    if (!address || !profile) return;
+    if (!address || !profile || !prompts[0]) return;
     setIsLoading(true);
     setSpinning(true);
     setError("");
@@ -54,7 +57,7 @@ export default function ChaosLabPage() {
       setTraces(getTraces());
       setTxStatus("Sending to GenLayer...");
 
-      const { verdict: receiptVerdict, rawVerdict } = await invokeChaosAction(address, text);
+      const { verdict: receiptVerdict, rawVerdict } = await invokeChaosAction(address, prompts[0].id, text);
       setTxStatus("Consensus reached. Reading verdict...");
       setStructuredVerdict(receiptVerdict ?? null);
       const updatedProfile = await getProfile(address);
@@ -115,6 +118,7 @@ export default function ChaosLabPage() {
           </div>
           <div className="p-4 space-y-4">
             <ChaosWheel spinning={spinning} />
+            <p className="text-xs text-[#6B6257]">Prompt: {prompts[0]?.text ?? "No active on-chain prompt"}</p>
             <ChaosActionForm onSubmit={handleSubmit} isLoading={isLoading} hasUsedToday={hasUsedToday} />
             {error && <p className="text-xs text-[#FF3B30]">{error}</p>}
             {txStatus && (

@@ -10,7 +10,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { getProfile, createProfile, getChaosFeed, getActivePrompts, getProtocolStats } from "@/lib/genlayer/contract";
+import { getProfile, createProfile, createPrompt, getChaosFeed, getActivePrompts, getProtocolStats } from "@/lib/genlayer/contract";
 import { getLastVerdict } from "@/lib/jestora/localCache";
 import type { PlayerProfile, ChaosEvent, Prompt, ProtocolStats, AnyVerdict } from "@/lib/genlayer/types";
 import Link from "next/link";
@@ -27,6 +27,8 @@ export default function ArenaPage() {
   const [stats, setStats] = useState<ProtocolStats | null>(null);
   const [lastVerdict, setLastVerdict] = useState<AnyVerdict | null>(null);
   const [loading, setLoading] = useState(true);
+  const [promptText, setPromptText] = useState("");
+  const [promptStatus, setPromptStatus] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +93,19 @@ export default function ArenaPage() {
       setCreateStatus("");
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleCreatePrompt = async () => {
+    if (!address || !promptText.trim()) return;
+    setPromptStatus("Moderating with independent validators...");
+    try {
+      await createPrompt(address, promptText.trim());
+      setPromptText("");
+      setPromptStatus("Prompt approved and published on-chain.");
+      setPrompts(await getActivePrompts());
+    } catch (e: unknown) {
+      setPromptStatus((e as Error).message ?? "Prompt rejected.");
     }
   };
 
@@ -163,6 +178,16 @@ export default function ArenaPage() {
             <ActivePromptCard prompt={prompts[0] ?? null} />
             <LatestVerdictCard verdict={lastVerdict} />
           </div>
+        </div>
+
+        {/* Quick actions */}
+        <div className="border-4 border-[#0057FF] bg-white p-4 shadow-[4px_4px_0px_#121212]">
+          <p className="text-xs font-black uppercase tracking-widest text-[#0057FF] mb-2">Community Prompt Hub</p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Input value={promptText} onChange={(e) => setPromptText(e.target.value)} maxLength={300} placeholder="Write a fresh meme prompt (12-300 chars)" />
+            <Button onClick={handleCreatePrompt} disabled={!promptText.trim() || !!promptStatus.includes("Moderating")}>Publish Prompt</Button>
+          </div>
+          {promptStatus && <p className="text-[10px] font-mono text-[#6B6257] mt-2">{promptStatus}</p>}
         </div>
 
         {/* Quick actions */}

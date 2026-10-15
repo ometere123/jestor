@@ -6,9 +6,9 @@ import DuelCreateForm from "@/components/duels/DuelCreateForm";
 import DuelCard from "@/components/duels/DuelCard";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { startDuel, joinDuel, resolveDuel, getLatestDuelId, getOpenDuels, getAllDuels } from "@/lib/genlayer/contract";
+import { startDuel, joinDuel, resolveDuel, getLatestDuelId, getOpenDuels, getAllDuels, getActivePrompts } from "@/lib/genlayer/contract";
 import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
-import type { Duel } from "@/lib/genlayer/types";
+import type { Duel, Prompt } from "@/lib/genlayer/types";
 
 export default function DuelsPage() {
   const { address } = useWallet();
@@ -18,6 +18,9 @@ export default function DuelsPage() {
   const [error, setError] = useState("");
   const [txStatus, setTxStatus] = useState("");
   const [loadingDuels, setLoadingDuels] = useState(true);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+
+  useEffect(() => { void getActivePrompts().then(setPrompts).catch(() => setPrompts([])); }, []);
 
   const refreshDuels = useCallback(async () => {
     try {
@@ -123,7 +126,7 @@ export default function DuelsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="border-4 border-[#7A35FF] bg-white p-4 shadow-[4px_4px_0px_#121212]">
             <p className="text-xs font-black uppercase tracking-widest text-[#6B6257] mb-3">Start a Duel</p>
-            <DuelCreateForm onSubmit={handleCreateDuel} isLoading={isLoading} />
+            <DuelCreateForm onSubmit={handleCreateDuel} isLoading={isLoading} prompts={prompts} />
             {error && <p className="text-xs text-[#FF3B30] mt-2">{error}</p>}
             {txStatus && (
               <p className="text-[10px] font-mono text-[#0057FF] mt-2 animate-pulse">{txStatus}</p>
