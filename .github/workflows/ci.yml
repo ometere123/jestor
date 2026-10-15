@@ -1,0 +1,84 @@
+name: Jestor verification
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-and-direct:
+    name: Static, build, lint, Direct Mode
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Use Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Install pinned GenVM tooling
+        run: python -m pip install --disable-pip-version-check genvm-linter==0.11.0 genlayer-test==0.29.2
+
+      - name: TypeScript
+        run: npx tsc --noEmit --pretty false
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: GenVM lint
+        run: genvm-lint contract/jestor_arena.py
+
+      - name: Direct Mode regression suite
+        env:
+          PYTHONIOENCODING: utf-8
+        run: npm run test:direct
+
+      - name: Production build
+        run: npm run build
+
+  live-studionet:
+    name: Secret-dependent Studionet smoke
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run finalized multi-wallet smoke
+        env:
+          GL_CONTRACT: ${{ secrets.JESTOR_STUDIONET_CONTRACT }}
+          GL_PK1: ${{ secrets.JESTOR_GL_PK1 }}
+          GL_PK2: ${{ secrets.JESTOR_GL_PK2 }}
+          GL_PK3: ${{ secrets.JESTOR_GL_PK3 }}
+          GL_PK4: ${{ secrets.JESTOR_GL_PK4 }}
+          GL_PK5: ${{ secrets.JESTOR_GL_PK5 }}
+          GL_PK6: ${{ secrets.JESTOR_GL_PK6 }}
+        run: node scripts/arena-circuit-smoke.mjs

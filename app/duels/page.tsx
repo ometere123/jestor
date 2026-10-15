@@ -6,9 +6,10 @@ import DuelCreateForm from "@/components/duels/DuelCreateForm";
 import DuelCard from "@/components/duels/DuelCard";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { startDuel, joinDuel, resolveDuel, getLatestDuelId, getOpenDuels, getAllDuels, getActivePrompts } from "@/lib/genlayer/contract";
+import { startDuel, joinDuel, revealDuel, resolveDuel, cancelDuel, recoverDuel, getSavedDuelDraft, getOpenDuels, getAllDuels, getActivePrompts } from "@/lib/genlayer/contract";
 import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
 import type { Duel, Prompt } from "@/lib/genlayer/types";
+import type { DuelDraft } from "@/lib/genlayer/duelDrafts";
 
 export default function DuelsPage() {
   const { address } = useWallet();
@@ -19,6 +20,7 @@ export default function DuelsPage() {
   const [txStatus, setTxStatus] = useState("");
   const [loadingDuels, setLoadingDuels] = useState(true);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, DuelDraft | null>>({});
 
   useEffect(() => { void getActivePrompts().then(setPrompts).catch(() => setPrompts([])); }, []);
 
@@ -37,6 +39,10 @@ export default function DuelsPage() {
       }
       merged.sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
       setActiveDuels(merged);
+      if (address) {
+        const saved = await Promise.all(merged.map(async (duel) => [duel.id, await getSavedDuelDraft(address, duel.id)] as const));
+        setDrafts(Object.fromEntries(saved));
+      }
     } catch { /* ignore */ }
     finally { setLoadingDuels(false); }
   }, [address]);
@@ -58,14 +64,9 @@ export default function DuelsPage() {
     setError("");
     setTxStatus("Sending to GenLayer...");
     try {
-      await startDuel(address, promptId, entry);
-      setTxStatus("Reading duel from chain...");
-      const duelId = await getLatestDuelId(address);
-      if (!duelId) {
-        setError("Duel started but could not fetch ID. Please refresh.");
-        return;
-      }
-      setTxStatus("Refreshing duel list...");
+      const result = await startDuel(address, promptId, entry);
+      if (!result.resultId) throw new Error("Duel committed but no deterministic duel identifier was returned.");
+      setTxStatus("Commit finalized. Waiting for Player B before reveal.");
       await refreshDuels();
       setTxStatus("");
     } catch (e: unknown) {
@@ -87,6 +88,57 @@ export default function DuelsPage() {
       setTxStatus("");
     } catch (e: unknown) {
       setError((e as Error).message ?? "Failed to join duel.");
+      setTxStatus("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReveal = async (duelId: string) => {
+    if (!address || !profile) return;
+    setIsLoading(true);
+    setError("");
+    setTxStatus("Revealing the saved entry on-chain...");
+    try {
+      await revealDuel(address, duelId);
+      await refreshDuels();
+      setTxStatus("");
+    } catch (e: unknown) {
+      setError((e as Error).message ?? "Reveal failed.");
+      setTxStatus("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCancel = async (duelId: string) => {
+    if (!address || !profile) return;
+    setIsLoading(true);
+    setError("");
+    setTxStatus("Cancelling the still-unjoined duel...");
+    try {
+      await cancelDuel(address, duelId);
+      await refreshDuels();
+      setTxStatus("");
+    } catch (e: unknown) {
+      setError((e as Error).message ?? "Cancellation failed.");
+      setTxStatus("");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRecover = async (duelId: string) => {
+    if (!address || !profile) return;
+    setIsLoading(true);
+    setError("");
+    setTxStatus("Recovering the expired duel permissionlessly...");
+    try {
+      await recoverDuel(address, duelId);
+      await refreshDuels();
+      setTxStatus("");
+    } catch (e: unknown) {
+      setError((e as Error).message ?? "Duel recovery failed.");
       setTxStatus("");
     } finally {
       setIsLoading(false);
@@ -150,7 +202,11 @@ export default function DuelsPage() {
                 duel={duel}
                 currentAddress={address ?? ""}
                 onJoin={handleJoin}
+                onReveal={handleReveal}
+                onCancel={handleCancel}
+                onRecover={handleRecover}
                 onResolve={handleResolve}
+                draft={drafts[duel.id] ?? null}
                 isLoading={isLoading}
               />
             ))}

@@ -4,7 +4,6 @@ import { useState } from "react";
 import Textarea from "@/components/ui/Textarea";
 import Button from "@/components/ui/Button";
 import { clientSafetyCheck } from "@/lib/jestora/safety";
-import { logAction } from "@/lib/jestora/localCache";
 
 interface CaptionSubmitFormProps {
   promptId: string | null;
@@ -33,7 +32,6 @@ export default function CaptionSubmitForm({
       setLocalError("Select a prompt first.");
       return;
     }
-    logAction("SUBMIT_CAPTION", `Submitting caption to round ${promptId}`);
     await onSubmit(caption);
     setCaption("");
   };

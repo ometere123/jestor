@@ -3,20 +3,41 @@
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import { shortAddress, timeAgo } from "@/lib/jestora/format";
+import { useEffect, useState } from "react";
 import type { Duel } from "@/lib/genlayer/types";
+import type { DuelDraft } from "@/lib/genlayer/duelDrafts";
 
 interface DuelCardProps {
   duel: Duel;
   currentAddress: string;
   onJoin: (duelId: string, entry: string) => Promise<void>;
+  onReveal: (duelId: string) => Promise<void>;
+  onCancel: (duelId: string) => Promise<void>;
+  onRecover: (duelId: string) => Promise<void>;
   onResolve: (duelId: string) => Promise<void>;
+  draft: DuelDraft | null;
   isLoading: boolean;
 }
 
-export default function DuelCard({ duel, currentAddress, onJoin, onResolve, isLoading }: DuelCardProps) {
+export default function DuelCard({ duel, currentAddress, onJoin, onReveal, onCancel, onRecover, onResolve, draft, isLoading }: DuelCardProps) {
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    const initial = window.setTimeout(() => setNow(Math.floor(Date.now() / 1000)), 0);
+    const interval = window.setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => { window.clearTimeout(initial); window.clearInterval(interval); };
+  }, []);
   const isPlayerA = duel.player_a.toLowerCase() === currentAddress.toLowerCase();
+  const isPlayerB = Boolean(duel.player_b) && duel.player_b.toLowerCase() === currentAddress.toLowerCase();
   const canJoin = duel.status === "waiting" && !isPlayerA;
+  const canCancel = duel.status === "waiting" && isPlayerA;
+  const canReveal = (duel.status === "reveal" || duel.status === "ready")
+    && ((isPlayerA && !duel.reveal_a) || (isPlayerB && !duel.reveal_b))
+    && Boolean(draft)
+    && draft?.phase !== "revealed";
   const canResolve = duel.status === "ready";
+  const joinExpired = duel.status === "waiting" && Boolean(duel.join_deadline && now > duel.join_deadline);
+  const revealExpired = duel.status === "reveal" && Boolean(duel.reveal_deadline && now > duel.reveal_deadline);
+  const canRecover = joinExpired || revealExpired;
 
   return (
     <div className="border-2 border-[#7A35FF] bg-white p-3 shadow-[3px_3px_0px_#121212] space-y-2">
@@ -53,6 +74,24 @@ export default function DuelCard({ duel, currentAddress, onJoin, onResolve, isLo
           if (entry) onJoin(duel.id, entry);
         }} disabled={isLoading} className="w-full">
           Join Duel
+        </Button>
+      )}
+      {canCancel && (
+        <Button size="sm" variant="danger" onClick={() => onCancel(duel.id)} disabled={isLoading} className="w-full">
+          Cancel before opponent joins
+        </Button>
+      )}
+      {canReveal && (
+        <Button size="sm" variant="blue" onClick={() => onReveal(duel.id)} disabled={isLoading} className="w-full">
+          {isLoading ? "Revealing..." : "Reveal saved entry"}
+        </Button>
+      )}
+      {(isPlayerA || isPlayerB) && (duel.status === "reveal" || duel.status === "ready") && !draft && ((isPlayerA && !duel.reveal_a) || (isPlayerB && !duel.reveal_b)) && (
+        <p className="text-[10px] text-[#FF3B30]">This browser has no saved salt for this participant. Reveal is intentionally blocked.</p>
+      )}
+      {canRecover && (
+        <Button size="sm" variant="primary" onClick={() => onRecover(duel.id)} disabled={isLoading} className="w-full">
+          Recover expired duel
         </Button>
       )}
       {canResolve && (

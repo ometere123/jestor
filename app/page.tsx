@@ -6,12 +6,12 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Sticker from "@/components/ui/Sticker";
 
-const DEMO_CONSOLE = [
+const ILLUSTRATIVE_FLOW = [
   { step: "SUBMIT_CAPTION", msg: "Received", color: "#FFE600" },
   { step: "SAFETY", msg: "No unsafe class detected", color: "#35E36D" },
   { step: "GENLAYER", msg: "_review_caption invoked", color: "#0057FF" },
-  { step: "VALIDATORS", msg: "Humour and rule checks running", color: "#00D8C8" },
-  { step: "CONSENSUS", msg: "outcome: ABSURD_GENIUS", color: "#7A35FF" },
+  { step: "RECEIPT", msg: "Finalized receipt proves the transaction", color: "#00D8C8" },
+  { step: "STATE", msg: "Authoritative result read from chain", color: "#7A35FF" },
   { step: "CAP", msg: "requested delta +92 capped to +80", color: "#FF3B30" },
   { step: "BALANCE", msg: "+80 Jest Points applied", color: "#35E36D" },
   { step: "EVENT", msg: "ChaosFeed updated", color: "#FFE600" },
@@ -70,11 +70,11 @@ export default function LandingPage() {
           </div>
           <div className="border-4 border-[#121212] shadow-[6px_6px_0px_#121212] overflow-hidden">
             <div className="bg-[#FFE600] border-b-4 border-[#121212] px-4 py-2 flex items-center gap-2">
-              <span className="font-['Rubik_Mono_One',monospace] text-sm">ACTIVE ROUND: Caption Rift #014</span>
-              <Badge variant="blue" className="ml-auto">PENDING</Badge>
+              <span className="font-['Rubik_Mono_One',monospace] text-sm">ILLUSTRATIVE VERDICT LIFECYCLE</span>
+              <Badge variant="yellow" className="ml-auto">NOT EVIDENCE</Badge>
             </div>
             <div className="bg-[#121212] p-4 font-mono text-xs space-y-1.5">
-              {DEMO_CONSOLE.map((line, i) => (
+              {ILLUSTRATIVE_FLOW.map((line, i) => (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0 }}
@@ -86,11 +86,7 @@ export default function LandingPage() {
                   <span className="text-[#D8D0BF]">{line.msg}</span>
                 </motion.div>
               ))}
-              <motion.span
-                animate={{ opacity: [1, 0, 1] }}
-                transition={{ repeat: Infinity, duration: 1 }}
-                className="text-[#00D8C8]"
-              >█</motion.span>
+              <p className="mt-3 text-[#6B6257]">Decorative overview only. Open a finalized verdict page for actual receipt and state evidence.</p>
             </div>
           </div>
         </section>
@@ -140,7 +136,7 @@ export default function LandingPage() {
             </div>
             <div>
               <p className="font-black text-[#121212] mb-1">Every balance change is traceable.</p>
-              <p>Each verdict page shows every step inline: safety scan, GenLayer invocation, validator check, cap, and final effect.</p>
+              <p>Each verdict page shows the submitted data, settled state, immutable history, balance effect, and optional verified receipt relationship.</p>
             </div>
           </div>
         </section>

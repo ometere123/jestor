@@ -118,7 +118,9 @@ export interface Submission {
   finalized?: boolean;
   challenged?: boolean;
   challenge_eligible_until?: number;
-  transaction_hash?: string;
+  original_verdict?: AnyVerdict | null;
+  current_accepted?: boolean;
+  settled_at?: number;
 }
 
 export interface Duel {
@@ -127,9 +129,9 @@ export interface Duel {
   prompt_text: string;
   player_a: string;
   entry_a: string;
-  player_b: string | null;
-  entry_b: string | null;
-  status: "waiting" | "reveal" | "ready" | "resolving" | "resolved" | "expired" | "cancelled";
+  player_b: string;
+  entry_b: string;
+  status: "waiting" | "reveal" | "ready" | "resolved" | "expired" | "cancelled";
   verdict: DuelVerdict | null;
   created_at: number;
   reveal_a?: boolean;
@@ -138,6 +140,9 @@ export interface Duel {
   reveal_deadline?: number;
   challenge_eligible_until?: number;
   challenged?: boolean;
+  original_verdict?: DuelVerdict | null;
+  finality_state?: string;
+  settled_at?: number;
 }
 
 export interface Prompt {
@@ -184,11 +189,19 @@ export interface ProtocolStats {
   total_challenges?: number;
   total_tournaments?: number;
   finalized_verdicts?: number;
+  chain_id?: number;
+  version?: string;
 }
 
 export interface Career extends PlayerProfile {
   recent_events: Array<{ kind: string; result_id: string; delta: number; timestamp: number }>;
   season_points: number;
+  career_scope?: {
+    records_are_finalized: boolean;
+    recent_event_limit: number;
+    duel_record: { wins: number; losses: number; draws: number };
+    remix_achievements: number;
+  };
 }
 
 export interface Tournament {
@@ -203,6 +216,7 @@ export interface Tournament {
   deadline: number;
   season: string;
   finalized: boolean;
+  champion?: string;
 }
 
 export interface ConsoleTrace {

@@ -10,8 +10,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { getProfile, createProfile, createPrompt, getChaosFeed, getActivePrompts, getProtocolStats } from "@/lib/genlayer/contract";
-import { getLastVerdict } from "@/lib/jestora/localCache";
+import { getProfile, createProfile, createPrompt, getChaosFeed, getActivePrompts, getProtocolStats, getLatestSubmissionId, getSubmission } from "@/lib/genlayer/contract";
 import type { PlayerProfile, ChaosEvent, Prompt, ProtocolStats, AnyVerdict } from "@/lib/genlayer/types";
 import Link from "next/link";
 
@@ -54,7 +53,9 @@ export default function ArenaPage() {
       setChaosEvents(cf);
       setPrompts(ap);
       setStats(s);
-      setLastVerdict(getLastVerdict() as AnyVerdict | null);
+      const latestId = await getLatestSubmissionId(address);
+      const latest = latestId ? await getSubmission(latestId) : null;
+      setLastVerdict((latest?.verdict as AnyVerdict | null) ?? null);
       setLoading(false);
     }
 

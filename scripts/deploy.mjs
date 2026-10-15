@@ -18,7 +18,10 @@ const contractCode = readFileSync(join(__dir, "../contract/jestor_arena.py"), "u
 async function main() {
   const account = createAccount(PRIVATE_KEY);
   const client = createClient({ chain: studionet, account });
+  const chainId = await client.getChainId();
+  if (Number(chainId) !== 61999) throw new Error("Refusing to deploy on chain " + chainId + "; expected Studionet 61999.");
   console.log("Deploying from:", account.address);
+  console.log("Studionet chain verified:", chainId);
   console.log("Contract size:", contractCode.length, "chars");
 
   console.log("\nDeploying...");
@@ -31,20 +34,26 @@ async function main() {
   console.log("Waiting for finalization...");
   const receipt = await client.waitForTransactionReceipt({
     hash,
+    status: "FINALIZED",
     retries: 60,
     interval: 5000,
+    fullTransaction: true,
   });
 
-  const contractAddr = receipt?.data?.contractAddress ?? receipt?.to_address ?? "(check receipt)";
+  const resultName = receipt?.resultName ?? ({ 6: "MAJORITY_AGREE", 7: "MAJORITY_DISAGREE" }[receipt?.result]);
+  const execution = receipt?.consensus_data?.leader_receipt?.[0]?.execution_result ?? receipt?.txExecutionResultName;
+  const finalized = receipt?.statusName === "FINALIZED" || receipt?.status === 7;
+  if (!finalized || resultName !== "MAJORITY_AGREE" || execution !== "SUCCESS") {
+    throw new Error("Deployment did not produce a finalized successful majority-agree receipt.");
+  }
+
+  const contractAddr = receipt?.data?.contractAddress ?? receipt?.contractAddress ?? receipt?.to_address;
+  if (!contractAddr) throw new Error("Finalized deployment receipt did not expose contractAddress; use the CLI receipt command for the authoritative address.");
   console.log("\n✅ Contract deployed!");
   console.log("Address:", contractAddr);
-  console.log("\nUpdate .env.local:");
+  console.log("Deployment receipt: FINALIZED / MAJORITY_AGREE / SUCCESS");
+  console.log("\nUpdate .env.local only after retrieving and hashing deployed source:");
   console.log(`NEXT_PUBLIC_GENLAYER_CONTRACT_ADDRESS=${contractAddr}`);
-
-  if (!contractAddr || contractAddr === "(check receipt)") {
-    console.log("\nFull receipt (find contractAddress):");
-    console.log(JSON.stringify(receipt, null, 2));
-  }
 }
 
 main().catch(console.error);

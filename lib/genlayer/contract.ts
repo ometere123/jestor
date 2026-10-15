@@ -1,10 +1,11 @@
 "use client";
 
 import type { CalldataEncodable } from "genlayer-js/types";
-import { sha256, toBytes } from "viem";
+import { TransactionHashVariant } from "genlayer-js/types";
 import { getContractAddress, getReadClient, getWriteClient, USE_MOCK, extractVerdictFromReceipt, extractReturnValueFromReceipt, receiptEvidence, type ReceiptEvidence } from "./client";
 import { mockContract } from "../jestora/mockContract";
 import type { Career, ChaosEvent, Duel, LeaderboardEntry, PlayerProfile, Prompt, ProtocolStats, Submission, Tournament } from "./types";
+import { createDuelDraft, createJoinDraft, getDuelDraft as readDuelDraft, markDuelDraftRevealed, removeDuelDraft, saveDuelDraft, type DuelDraft } from "./duelDrafts";
 
 type Arg = CalldataEncodable;
 
@@ -22,7 +23,7 @@ async function callRead(method: string, args: Arg[] = []): Promise<unknown> {
   const client = getReadClient();
   const address = getContractAddress();
   if (!address) throw new Error("Contract address is not configured.");
-  return client.readContract({ address, functionName: method, args });
+  return client.readContract({ address, functionName: method, args, transactionHashVariant: TransactionHashVariant.LATEST_FINAL });
 }
 
 async function callWrite(sender: string, method: string, args: Arg[] = []): Promise<WriteResult> {
@@ -41,8 +42,9 @@ async function callWrite(sender: string, method: string, args: Arg[] = []): Prom
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const receipt = await (readClient.waitForTransactionReceipt as any)({ hash, status: "FINALIZED", retries: 180, interval: 5000, fullTransaction: true });
   const evidence = receiptEvidence(receipt);
+  if (evidence.finality !== "finalized") throw new Error(`Transaction ${hash} did not reach FINALIZED state.`);
   if (evidence.executionResult === "ERROR" || evidence.executionResult === "FINISHED_WITH_ERROR") throw new Error(evidence.stderr || `Contract execution failed for ${hash}.`);
-  if (evidence.resultName === "MAJORITY_DISAGREE") throw new Error(`Independent validators did not reach majority agreement for ${hash}.`);
+  if (evidence.resultName !== "MAJORITY_AGREE") throw new Error(`Transaction ${hash} did not reach MAJORITY_AGREE.`);
   const returnValue = extractReturnValueFromReceipt(receipt);
   return { hash: String(hash), verdict: extractVerdictFromReceipt(receipt), rawVerdict: receipt?.consensus_data?.leader_receipt?.[0]?.eq_outputs ?? null, returnValue, resultId: typeof returnValue === "string" && returnValue ? returnValue : undefined, evidence };
 }
@@ -54,46 +56,60 @@ export async function submitRoastSelf(sender: string, promptId: string, text: st
 export async function invokeChaosAction(sender: string, promptId: string, text: string) { return callWrite(sender, "invoke_chaos_action", [promptId, text]); }
 export async function submitRemix(sender: string, promptId: string, sourceId: string, text: string) { return callWrite(sender, "submit_remix", [promptId, sourceId, text]); }
 
-function randomSalt(): string {
-  if (typeof window === "undefined") throw new Error("Duel commits require a browser wallet.");
-  const bytes = new Uint8Array(24); crypto.getRandomValues(bytes);
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-function duelCommitment(promptId: string, address: string, entry: string, salt: string): string {
-  return sha256(toBytes(`JESTOR-DUEL-V1|${promptId}|${address.toLowerCase()}|${salt}|${entry.trim()}`)).slice(2);
-}
-
 export async function startDuel(sender: string, promptId: string, entry: string): Promise<WriteResult> {
-  // The first transaction contains only the salted, domain-separated commitment.
-  // The reveal is a separate finalized transaction and is the only point where
-  // the entry becomes readable to the contract.
-  const salt = randomSalt();
-  const commitment = duelCommitment(promptId, sender, entry, salt);
-  const start = await callWrite(sender, "start_duel", [promptId, commitment]);
-  const duelId = await getLatestDuelId(sender);
-  if (!duelId) return start;
-  const reveal = await callWrite(sender, "reveal_duel_entry", [duelId, entry, salt]);
-  return { ...reveal, resultId: duelId };
+  const contract = getContractAddress();
+  if (!contract) throw new Error("Contract address is not configured.");
+  const draft = createDuelDraft(contract, sender, promptId, entry);
+  await saveDuelDraft(draft);
+  const result = await callWrite(sender, "start_duel", [promptId, draft.commitment, draft.clientNonce ?? ""]);
+  return { ...result, resultId: draft.duelId };
 }
 
 export async function joinDuel(sender: string, duelId: string, entry: string): Promise<WriteResult> {
   const duel = await getDuel(duelId);
   if (!duel) throw new Error("Duel not found.");
-  const salt = randomSalt();
-  const commitment = duelCommitment(duel.prompt_id, sender, entry, salt);
-  await callWrite(sender, "join_duel", [duelId, commitment]);
-  const reveal = await callWrite(sender, "reveal_duel_entry", [duelId, entry, salt]);
-  return { ...reveal, resultId: duelId };
+  const contract = getContractAddress();
+  if (!contract) throw new Error("Contract address is not configured.");
+  const draft = createJoinDraft(contract, sender, duelId, duel.prompt_id, entry);
+  await saveDuelDraft(draft);
+  const result = await callWrite(sender, "join_duel", [duelId, draft.commitment]);
+  return { ...result, resultId: duelId };
 }
 
-export async function resolveDuel(sender: string, duelId: string) { return callWrite(sender, "resolve_duel", [duelId]); }
-export async function cancelDuel(sender: string, duelId: string) { return callWrite(sender, "cancel_duel", [duelId]); }
+export async function revealDuel(sender: string, duelId: string): Promise<WriteResult> {
+  const contract = getContractAddress();
+  if (!contract) throw new Error("Contract address is not configured.");
+  const draft = await readDuelDraft(contract, sender, duelId);
+  if (!draft) throw new Error("Reveal data is not available in this browser. Recovery is blocked without the original salt.");
+  const result = await callWrite(sender, "reveal_duel_entry", [duelId, draft.entry, draft.salt]);
+  await markDuelDraftRevealed(draft);
+  return { ...result, resultId: duelId };
+}
+
+export async function getSavedDuelDraft(sender: string, duelId: string): Promise<DuelDraft | null> {
+  const contract = getContractAddress();
+  return contract ? readDuelDraft(contract, sender, duelId) : null;
+}
+
+export async function resolveDuel(sender: string, duelId: string) {
+  const result = await callWrite(sender, "resolve_duel", [duelId]);
+  const contract = getContractAddress();
+  if (contract) await removeDuelDraft(contract, sender, duelId);
+  return result;
+}
+export async function recoverDuel(sender: string, duelId: string) { return resolveDuel(sender, duelId); }
+export async function cancelDuel(sender: string, duelId: string) {
+  const result = await callWrite(sender, "cancel_duel", [duelId]);
+  const contract = getContractAddress();
+  if (contract) await removeDuelDraft(contract, sender, duelId);
+  return result;
+}
 export async function challengeVerdict(sender: string, resultId: string, text: string) { return callWrite(sender, "challenge_verdict", [resultId, text]); }
-export async function recordTransactionHash(sender: string, resultId: string, hash: string) { return callWrite(sender, "record_transaction_hash", [resultId, hash]); }
 export async function createTournament(sender: string, promptId: string, startsAt: number) { return callWrite(sender, "create_tournament", [promptId, startsAt]); }
 export async function joinTournament(sender: string, tournamentId: string, entry: string) { return callWrite(sender, "join_tournament", [tournamentId, entry]); }
 export async function settleTournamentMatch(sender: string, tournamentId: string, matchIndex: number) { return callWrite(sender, "settle_tournament_match", [tournamentId, matchIndex]); }
+export async function finalizeTournament(sender: string, tournamentId: string) { return callWrite(sender, "finalize_tournament", [tournamentId]); }
+export async function recoverTournament(sender: string, tournamentId: string) { return callWrite(sender, "recover_tournament", [tournamentId]); }
 
 export async function getProfile(address: string): Promise<PlayerProfile | null> {
   const result = await callRead("get_profile", [address.toLowerCase()]);

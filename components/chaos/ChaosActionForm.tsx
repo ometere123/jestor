@@ -4,7 +4,6 @@ import { useState } from "react";
 import Textarea from "@/components/ui/Textarea";
 import Button from "@/components/ui/Button";
 import { clientSafetyCheck } from "@/lib/jestora/safety";
-import { logAction } from "@/lib/jestora/localCache";
 
 const CHAOS_EXAMPLES = [
   "Rename my rank using only pirate energy.",
@@ -28,7 +27,6 @@ export default function ChaosActionForm({ onSubmit, isLoading, hasUsedToday }: C
     setError("");
     const { safe, reason } = clientSafetyCheck(text);
     if (!safe) { setError(reason); return; }
-    logAction("INVOKE_CHAOS", "Invoking chaos action");
     await onSubmit(text);
     setText("");
   };

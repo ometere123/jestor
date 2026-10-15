@@ -100,6 +100,7 @@ export async function callWrite(client, functionName, args, callerLabel) {
 
       const receipt = await client.waitForTransactionReceipt({
         hash,
+        status: "FINALIZED",
         retries: 200,
         interval: 3000,
       });
@@ -111,7 +112,13 @@ export async function callWrite(client, functionName, args, callerLabel) {
       } catch { /* fall back to receipt */ }
 
       const execResult = parseExecResult(txData) ?? parseExecResult(receipt);
+      const statusName = receipt?.statusName ?? receipt?.status_name ?? (receipt?.status === 7 ? "FINALIZED" : undefined);
+      const resultName = receipt?.resultName ?? ({ 6: "MAJORITY_AGREE", 7: "MAJORITY_DISAGREE" }[receipt?.result]);
       const ms = Date.now() - t0;
+
+      if (statusName !== "FINALIZED") throw new Error(`${functionName} did not finalize (status=${statusName ?? "unknown"})`);
+      if (resultName !== "MAJORITY_AGREE") throw new Error(`${functionName} did not reach MAJORITY_AGREE (result=${resultName ?? "unknown"})`);
+      if (execResult !== "SUCCESS" && execResult !== "FINISHED_WITH_RETURN") throw new Error(`${functionName} did not execute successfully (execution=${execResult ?? "unknown"})`);
 
       if (execResult === "ERROR") {
         const error = parseStderr(txData) || parseStderr(receipt);

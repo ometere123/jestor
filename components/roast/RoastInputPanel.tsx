@@ -4,7 +4,6 @@ import { useState } from "react";
 import Textarea from "@/components/ui/Textarea";
 import Button from "@/components/ui/Button";
 import { clientSafetyCheck } from "@/lib/jestora/safety";
-import { logAction } from "@/lib/jestora/localCache";
 
 const ROAST_EXAMPLES = [
   "My Jest Points are so low they filed for emotional bankruptcy.",
@@ -25,7 +24,6 @@ export default function RoastInputPanel({ onSubmit, isLoading }: RoastInputPanel
     setError("");
     const { safe, reason } = clientSafetyCheck(text);
     if (!safe) { setError(reason); return; }
-    logAction("SUBMIT_ROAST", "Submitting self-roast");
     await onSubmit(text);
     setText("");
   };
