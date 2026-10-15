@@ -763,7 +763,7 @@ not transformative. The allowed decision must follow the score thresholds."""
         winner = "A" if ar and not br else "B" if br and not ar else "NO_CONTEST"
         da = self._apply(a, 15, self.DUEL_WIN_MAX) if winner == "A" else 0; db = self._apply(b, 15, self.DUEL_WIN_MAX) if winner == "B" else 0
         verdict = {"winner": winner, "entry_a_score": 0, "entry_b_score": 0, "a_delta": da, "b_delta": db, "actual_a_delta": da, "actual_b_delta": db, "safety_class": "SAFE", "reason": "Missing reveal resolved permissionlessly after the reveal deadline."}
-        duel["verdict"] = verdict; duel["original_verdict"] = self._clone(verdict); duel["status"] = "blocked" if winner == "NO_CONTEST" else "resolved"; duel["finalized"] = True; duel["settled_at"] = self._now(); duel["finality_state"] = "state_finalized"; duel["challenge_eligible_until"] = self._now() + self.CHALLENGE_WINDOW; self._write(self.duels, duel["id"], duel); self._duel_profile_shift(duel, winner, 1)
+        duel["verdict"] = verdict; duel["original_verdict"] = self._clone(verdict); duel["status"] = "blocked" if winner == "NO_CONTEST" else "resolved"; duel["finalized"] = True; duel["settled_at"] = self._now(); duel["finality_state"] = "state_finalized"; duel["challenge_eligible_until"] = 0; duel["challenge_disabled_reason"] = "Deterministic missing-reveal forfeit; no semantic judgment was issued."; self._write(self.duels, duel["id"], duel); self._duel_profile_shift(duel, winner, 1)
         for who, delta in [(a, da), (b, db)]:
             p = self._profile(who); p["verdict_count"] = int(p.get("verdict_count", 0)) + 1; self._save_profile(who, p); self._career_event(who, "duel_forfeit", duel["id"], delta)
         self._record_history(duel["id"], "initial", duel["original_verdict"], {a: da, b: db}); self._inc("finalized_verdicts")
@@ -811,13 +811,13 @@ not transformative. The allowed decision must follow the score thresholds."""
     def _challenge_task(self, kind: str, result: dict, challenge_text: str) -> str:
         if kind == "submission":
             shape_rules = """This result is a single-player submission. For every KEEP or
-ADJUST response, set result_kind to submission, new_winner to DRAW, and
-new_a_delta and new_b_delta to 0. Set new_valid and new_allowed to true only
-when the reassessed submission is safe and eligible; otherwise set both false,
-new_safety_class to an unsafe class, and new_delta to 0. For a safe ADJUST,
-new_delta is the proposed deterministic single-player point delta. For KEEP,
-copy the existing accepted/safety decision and deterministic delta exactly into
-the corresponding new_* fields."""
+ADJUST response, set result_kind to submission and new_a_delta and new_b_delta
+to 0. A safe submission uses new_winner DRAW; an unsafe or blocked submission
+uses new_winner NO_CONTEST, new_allowed false, new_valid false, and new_delta 0.
+Set new_valid and new_allowed to true only when the reassessed submission is
+safe and eligible. For a safe ADJUST, new_delta is the proposed deterministic
+single-player point delta. For KEEP, copy the existing accepted/safety decision
+and deterministic delta exactly into the corresponding new_* fields."""
         elif kind == "tournament":
             reward_winner = 40 if int(result.get("index", -1)) == 2 else 20
             reward_loser = 10 if int(result.get("index", -1)) == 2 else 5
@@ -859,10 +859,12 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
             if verdict.get("new_a_delta") != 0 or verdict.get("new_b_delta") != 0:
                 return False
             if verdict.get("decision") == "KEEP":
-                if verdict.get("new_winner") != "DRAW":
-                    return False
                 current = result.get("verdict", {})
-                return verdict.get("new_safety_class") == current.get("safety_class", "SAFE") and verdict.get("new_allowed") == accepted and verdict.get("new_valid") == accepted and verdict.get("new_delta") == int(result.get("balance_delta", 0))
+                current_safe = current.get("safety_class", "SAFE") == "SAFE"
+                expected_winner = "DRAW" if current_safe else "NO_CONTEST"
+                expected_allowed = accepted if current_safe else False
+                expected_valid = accepted if current_safe else False
+                return verdict.get("new_winner") == expected_winner and verdict.get("new_safety_class") == current.get("safety_class", "SAFE") and verdict.get("new_allowed") == expected_allowed and verdict.get("new_valid") == expected_valid and verdict.get("new_delta") == int(result.get("balance_delta", 0))
             if verdict.get("decision") == "BLOCK":
                 return verdict.get("new_winner") == "NO_CONTEST" and verdict.get("new_safety_class") != "SAFE" and not verdict.get("new_allowed") and not verdict.get("new_valid") and verdict.get("new_delta") == 0
             if verdict.get("new_winner") != "DRAW":
@@ -897,6 +899,8 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         addr = self._addr(); self._require_profile(addr); clean = self._text(challenge_text, "Challenge", 12, 600)
         kind, result, tournament_id, match_index = self._result_ref(result_id)
         if not kind or not result.get("finalized"): raise gl.vm.UserError("[EXPECTED] Result is not challengeable.")
+        if kind == "tournament" and self._read(self.tournaments, tournament_id).get("finalized"):
+            raise gl.vm.UserError("[EXPECTED] Tournament outcome already finalized.")
         if result.get("status") in {"expired", "cancelled"}: raise gl.vm.UserError("[EXPECTED] Result is not challengeable.")
         if result.get("challenged") or result_id in self.challenges: raise gl.vm.UserError("[EXPECTED] Result already challenged.")
         if addr in {result.get("author"), result.get("player_a"), result.get("player_b")}: raise gl.vm.UserError("[EXPECTED] Participants cannot challenge their own result.")
@@ -943,8 +947,7 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
                 if kind == "duel": self._duel_profile_shift(result, old_winner, -1); self._duel_profile_shift(result, new_winner, 1)
                 if kind == "tournament": self._tournament_profile_shift(result, old_winner, -1); self._tournament_profile_shift(result, new_winner, 1)
             result["verdict"]["winner"] = new_winner; result["verdict"]["safety_class"] = new_safety; result["verdict"]["actual_a_delta"] = actual_a; result["verdict"]["actual_b_delta"] = actual_b
-            if kind == "duel": result["status"] = "blocked" if new_winner == "NO_CONTEST" else "resolved"
-            if new_winner == "NO_CONTEST" and kind == "tournament": result["status"] = "blocked"
+            if kind in {"duel", "tournament"}: result["status"] = "resolved" if new_winner in {"A", "B"} else "blocked"
             if kind == "duel": self._write(self.duels, result_id, result)
             else:
                 tournament = self._read(self.tournaments, tournament_id); tournament["matches"][match_index] = result; self._write(self.tournaments, tournament_id, tournament)
@@ -1071,6 +1074,13 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
             if final.get("status") not in {"resolved", "blocked"} or now < int(final.get("challenge_eligible_until", 0)): return
             self._finalize_tournament_result(t)
 
+    def _tournament_has_open_challenge(self, t: dict) -> bool:
+        now = self._now()
+        for match in t.get("matches", []):
+            if match.get("finalized") and not match.get("challenged") and now < int(match.get("challenge_eligible_until", 0)):
+                return True
+        return False
+
     @gl.public.write
     def settle_tournament_match(self, tournament_id: str, match_index: int) -> str:
         if tournament_id not in self.tournaments: raise gl.vm.UserError("[EXPECTED] Tournament not found.")
@@ -1092,6 +1102,7 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero.
         if t.get("finalized"): return
         now = self._now()
         if now <= int(t.get("deadline", 0)): raise gl.vm.UserError("[EXPECTED] Tournament has not expired.")
+        if self._tournament_has_open_challenge(t): return
         self._advance_tournament(t)
         if not t.get("finalized"):
             t["stage"] = "expired"; t["status"] = "expired"; t["finalized"] = True; t["settled_at"] = now

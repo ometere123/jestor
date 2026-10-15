@@ -92,6 +92,24 @@ def mock_challenge_block(vm):
     )
 
 
+def mock_challenge_restore_tournament(vm):
+    vm.mock_llm(
+        r"Independently rejudge a finalized Jestor result.*",
+        json.dumps({
+            "result_kind": "tournament",
+            "decision": "ADJUST",
+            "new_delta": 0,
+            "new_a_delta": 20,
+            "new_b_delta": 5,
+            "new_winner": "A",
+            "new_safety_class": "SAFE",
+            "new_allowed": True,
+            "new_valid": True,
+            "reason": "Independent reassessment restores the legitimate winner.",
+        }),
+    )
+
+
 def mock_remix(vm):
     vm.mock_llm(
         r"Independently assess a transformative remix.*",
@@ -209,6 +227,10 @@ def test_untrusted_data_cannot_escape_judgment_markers_and_challenge_shape_is_bo
     tournament_keep = {"decision": "KEEP", "new_delta": 0, "new_a_delta": 20, "new_b_delta": 5, "new_winner": "A", "new_safety_class": "SAFE", "new_allowed": True, "new_valid": True}
     assert arena._challenge_shape_matches("tournament", tournament, tournament_keep | {"reason": "keep"}) is True
     assert arena._challenge_shape_matches("tournament", tournament, tournament_keep | {"new_a_delta": 60, "reason": "forged"}) is False
+    blocked_submission = {"type": "caption", "current_accepted": False, "balance_delta": 0, "verdict": {"safety_class": "UNSAFE"}}
+    blocked_keep = {"result_kind": "submission", "decision": "KEEP", "new_delta": 0, "new_a_delta": 0, "new_b_delta": 0, "new_winner": "NO_CONTEST", "new_safety_class": "UNSAFE", "new_allowed": False, "new_valid": False, "reason": "keep blocked"}
+    assert arena._valid("challenge", blocked_keep) is True
+    assert arena._challenge_shape_matches("submission", blocked_submission, blocked_keep) is True
 
 
 def test_challenge_is_substantive_idempotent_and_preserves_original_history(direct_vm, direct_deploy, direct_accounts):
@@ -327,3 +349,47 @@ def test_draw_blocks_tournament_and_never_advances_player_a(direct_vm, direct_de
     assert updated["finalized"] is True
     assert updated["stage"] == "blocked"
     assert updated.get("champion") is None
+
+
+def test_challenge_reopens_tournament_match_before_finalization(direct_vm, direct_deploy, direct_accounts):
+    arena = direct_deploy(CONTRACT)
+    players = direct_accounts[:4]
+    challenger = direct_accounts[4]
+    create_profiles(arena, direct_vm, players + [challenger])
+    prompt_id = create_prompt(arena, direct_vm, players[0], "A circuit referee must revisit a blocked moon parade.")
+    direct_vm.sender = players[0]
+    tournament_id = arena.create_tournament(prompt_id, int(time.time()) + 120)
+    match_id = f"{tournament_id}:0"
+    future = int(time.time()) + 900
+    match = {
+        "id": match_id,
+        "index": 0,
+        "player_a": address(players[0]),
+        "entry_a": "A moon parade with a paper crown",
+        "player_b": address(players[1]),
+        "entry_b": "A moon parade with a cardboard cape",
+        "status": "blocked",
+        "verdict": {"winner": "NO_CONTEST", "a_delta": 0, "b_delta": 0, "actual_a_delta": 0, "actual_b_delta": 0, "safety_class": "SAFE"},
+        "original_verdict": {"winner": "NO_CONTEST", "a_delta": 0, "b_delta": 0, "actual_a_delta": 0, "actual_b_delta": 0, "safety_class": "SAFE"},
+        "settled": True,
+        "finalized": True,
+        "challenged": False,
+        "challenge_eligible_until": future,
+    }
+    tournament = json.loads(arena.tournaments[tournament_id])
+    tournament["players"] = [{"address": address(account), "entry": f"entry {index}"} for index, account in enumerate(players)]
+    tournament["matches"] = [match]
+    tournament["stage"] = "semifinals"
+    tournament["status"] = "active"
+    tournament["finalized"] = False
+    arena.tournaments[tournament_id] = json.dumps(tournament)
+    arena.tournament_match_index[match_id] = f"{tournament_id}|0"
+    assert arena._tournament_has_open_challenge(tournament) is True
+    direct_vm.sender = challenger
+    mock_challenge_restore_tournament(direct_vm)
+    arena.challenge_verdict(match_id, "Reassess the blocked semifinal winner and its deterministic reward.")
+    updated = arena.get_tournament(tournament_id)
+    assert updated["matches"][0]["status"] == "resolved"
+    assert updated["matches"][0]["verdict"]["winner"] == "A"
+    assert updated["matches"][0]["challenged"] is True
+    assert arena._tournament_has_open_challenge(updated) is False
