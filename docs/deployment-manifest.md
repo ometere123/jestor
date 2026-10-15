@@ -122,7 +122,7 @@ provider-dependent test.
 | Effective public RPC bundle check | `https://studio.genlayer.com/api` present |
 | Wallet bundle check | `window.ethereum` provider path present |
 | Build/deployment smoke | Homepage and `/verdict/final-release-smoke` returned HTTP 200 immediately after the corrected deployment was built; served bundles contained the new contract, Studionet RPC, chain `61999`, and injected `window.ethereum` support |
-| Latest public edge check | On `2026-10-16T00:40:35+01:00`, both `https://jestor.vercel.app` and the deployment URL returned HTTP 402 `Payment required / DEPLOYMENT_DISABLED` with Vercel request references `cpt1::khqgv-1792107645020-fac8a97edfa9` and `cpt1::qdlg2-1792107645399-7f54836c7576` |
+| Latest public edge check | On `2026-10-16T00:46:59+01:00`, both `https://jestor.vercel.app` and the deployment URL returned HTTP 402 `Payment required / DEPLOYMENT_DISABLED` with Vercel request references `cpt1::wjgjw-1792108039451-ab14132f0fc1` and `cpt1::xkzzl-1792108039820-6f464c387d4e` |
 
 Vercel Production and Preview values for contract address, chain ID, RPC, and
 `NEXT_PUBLIC_USE_MOCK_CONTRACT=false` were updated through the Vercel CLI before

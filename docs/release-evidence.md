@@ -307,11 +307,13 @@ the Vercel control plane), inspectable at
 The deployment built successfully and its served bundle was verified while it
 returned HTTP 200, including the corrected contract address, Studionet RPC,
 chain `61999`, and injected `window.ethereum` path. The latest public edge
-check at `2026-10-16T00:40:35+01:00` returned HTTP 402
+check at `2026-10-16T00:46:59+01:00` returned HTTP 402
 `Payment required / DEPLOYMENT_DISABLED` for both the production alias and the
-deployment URL. This is a Vercel account/provider enablement blocker, not a
-successful production smoke test; production availability remains unresolved
-until Vercel re-enables the project. The production dependency audit passed
+deployment URL (request references `cpt1::wjgjw-1792108039451-ab14132f0fc1` and
+`cpt1::xkzzl-1792108039820-6f464c387d4e`). This is a Vercel
+account/provider enablement blocker, not a successful production smoke test;
+production availability remains unresolved until Vercel re-enables the project.
+The production dependency audit passed
 with `npm audit --omit=dev` reporting zero vulnerabilities. The live browser
 transaction spec is intentionally skipped on hosts without an injected
 EIP-1193 provider; this host had none, so no browser transaction is claimed as
