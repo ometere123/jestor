@@ -37,13 +37,14 @@ The release candidate passed:
 - `npm run lint`: passed.
 - `npx tsc --noEmit --pretty false`: passed.
 - `npm run build`: passed; 14 Next.js routes generated.
+- `npm audit --omit=dev`: passed with 0 production vulnerabilities.
 - `npm run test:e2e`: 2 local browser smoke tests passed; the real-wallet
   test remained skipped because no injected provider was available.
 - `git diff --check`: passed for the release changes.
 
 GitHub Actions run
-[`38789504493`](https://github.com/ometere123/jestor/actions/runs/38789504493)
-passed the static/build/lint/Direct Mode job on commit `a81187c`. Its
+[`38823042366`](https://github.com/ometere123/jestor/actions/runs/38823042366)
+passed the static/build/lint/Direct Mode job on commit `5feda3e`. Its
 secret-dependent Studionet job was intentionally skipped because repository
 secrets are not configured; the live evidence below was executed locally with
 five funded CLI-managed wallets, with the fifth used only as a non-participant
