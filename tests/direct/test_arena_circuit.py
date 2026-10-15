@@ -68,7 +68,7 @@ def mock_caption(vm):
             "humor_score": 80,
             "originality_score": 80,
             "outcome": "ABSURD_GENIUS",
-            "balance_delta": 80,
+            "balance_delta": 40,
             "reason": "Safe and original.",
         }),
     )
