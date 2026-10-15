@@ -52,11 +52,14 @@ secrets are not configured; the live evidence below was executed locally with
 five funded CLI-managed wallets, with the fifth used only as a non-participant
 challenger.
 
-After the branch was fast-forwarded into `master`, the final master-head run
-[`38823638629`](https://github.com/ometere123/jestor/actions/runs/38823638629)
-also passed the complete static/build/lint/Direct Mode job on commit
-`7cce402`; its secret-dependent live job was skipped for the same explicit
-missing-secrets reason.
+After the branch was fast-forwarded into `master`, the final implementation
+verification run
+[`38824582569`](https://github.com/ometere123/jestor/actions/runs/38824582569)
+passed the complete static/build/lint/Direct Mode job on commit `e6cc091`.
+Its secret-dependent Studionet job was skipped for the same explicit
+missing-secrets reason. A later documentation-only commit records the
+provider-level hosting state below; the implementation evidence remains tied
+to `e6cc091`.
 
 The direct suite covers deterministic invariants and adversarial leader
 outputs. Direct Mode does not itself prove validator agreement; that evidence
@@ -298,11 +301,18 @@ the [corrected deployment manifest](deployment-manifest.md). That manifest is
 the current release record; the older tables above are retained only for
 historical audit traceability and do not describe the production contract.
 
-The final frontend redeploy is `dpl_ESybnXTRQf5iv3TFqNohbofT5tHv` (`READY`),
-inspectable at
+The final frontend redeploy is `dpl_ESybnXTRQf5iv3TFqNohbofT5tHv` (`READY` in
+the Vercel control plane), inspectable at
 `https://vercel.com/delealufejoel-4184s-projects/jestor/ESybnXTRQf5iv3TFqNohbofT5tHv`.
-The production alias is [jestor.vercel.app](https://jestor.vercel.app). The
-production dependency audit passed with `npm audit --omit=dev` reporting zero
-vulnerabilities. The live browser transaction spec is intentionally skipped on
-hosts without an injected EIP-1193 provider; this host had none, so no browser
-transaction is claimed as executed evidence.
+The deployment built successfully and its served bundle was verified while it
+returned HTTP 200, including the corrected contract address, Studionet RPC,
+chain `61999`, and injected `window.ethereum` path. The latest public edge
+check at `2026-10-16T00:40:35+01:00` returned HTTP 402
+`Payment required / DEPLOYMENT_DISABLED` for both the production alias and the
+deployment URL. This is a Vercel account/provider enablement blocker, not a
+successful production smoke test; production availability remains unresolved
+until Vercel re-enables the project. The production dependency audit passed
+with `npm audit --omit=dev` reporting zero vulnerabilities. The live browser
+transaction spec is intentionally skipped on hosts without an injected
+EIP-1193 provider; this host had none, so no browser transaction is claimed as
+executed evidence.

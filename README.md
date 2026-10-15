@@ -21,10 +21,17 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
 | Retrieved deployed source bytes | `93796` (raw Studionet response) |
 | Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` (LF-normalized) |
-| Production frontend | [jestor.vercel.app](https://jestor.vercel.app) |
+| Production frontend | [jestor.vercel.app](https://jestor.vercel.app) (Vercel currently returns a provider-level `402 DEPLOYMENT_DISABLED`; see release evidence) |
 
 The release is one cohesive state machine in
 [contract/jestor_arena.py](/C:/Users/USER/Desktop/NEW%20GENLAYER%20BUILDS/jestor/contract/jestor_arena.py).
+The corrected Vercel deployment built successfully and was bundle-verified,
+but the Vercel project is currently disabled at the provider edge: as of the
+final audit it returns HTTP 402 `DEPLOYMENT_DISABLED` even though the Vercel
+control plane reports the deployment `READY`. This is an external hosting
+account blocker; no contract or wallet claim treats that response as a live
+frontend smoke-test success. See [the release evidence](docs/release-evidence.md)
+for the deployment ID and exact verification state.
 The historical v0.2 deployment
 `0x148aEB21f9ED1aD76b38EDCC8d8c845b3E1F220A` remains a reference
 only. The superseded v0.4 candidate
