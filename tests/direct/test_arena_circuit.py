@@ -108,6 +108,10 @@ def test_profile_prompt_bounds_and_invalid_prompt_reference(direct_vm, direct_de
     arena = direct_deploy(CONTRACT)
     direct_vm.sender = direct_alice
     arena.create_profile("alice")
+    class AddressLike:
+        def __str__(self):
+            return address(direct_alice)
+    assert arena._address(AddressLike()) == address(direct_alice)
     create_prompt(arena, direct_vm, direct_alice)
     with direct_vm.expect_revert("Prompt not found"):
         arena.start_duel("not-a-prompt", "0" * 64, "nonce-that-is-long-enough")

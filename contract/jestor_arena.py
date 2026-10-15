@@ -99,6 +99,9 @@ class JestoraArena(gl.Contract):
     def _addr(self) -> str:
         return str(gl.message.sender_address).lower()
 
+    def _address(self, value) -> str:
+        return str(value).lower()
+
     def _now(self) -> int:
         return int(datetime.now(timezone.utc).timestamp())
 
@@ -986,13 +989,13 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero."""
     # -------------------------- public views ---------------------------
     @gl.public.view
     def get_profile(self, address: str) -> dict:
-        addr = address.lower()
+        addr = self._address(address)
         if addr not in self.profiles: return {}
         p = self._profile(addr); p["balance"] = int(self.balances.get(addr, 0)); p["badges"] = self._badges(p); return p
 
     @gl.public.view
     def get_balance(self, address: str) -> int:
-        return int(self.balances.get(address.lower(), 0))
+        return int(self.balances.get(self._address(address), 0))
 
     @gl.public.view
     def get_submission(self, submission_id: str) -> dict:
@@ -1016,11 +1019,11 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero."""
 
     @gl.public.view
     def get_latest_duel_id(self, address: str) -> str:
-        return self.latest_duel.get(address.lower(), "")
+        return self.latest_duel.get(self._address(address), "")
 
     @gl.public.view
     def get_latest_submission_id(self, address: str) -> str:
-        return self.latest_submission.get(address.lower(), "")
+        return self.latest_submission.get(self._address(address), "")
 
     @gl.public.view
     def get_open_duels(self) -> list:
@@ -1087,7 +1090,7 @@ deterministic effect. BLOCK makes the result unsafe/no-contest and zero."""
 
     @gl.public.view
     def get_career(self, address: str) -> dict:
-        addr = address.lower(); result = self.get_profile(addr)
+        addr = self._address(address); result = self.get_profile(addr)
         if not result: return {}
         current_season = str(self._now() // (30 * 86400))
         result["recent_events"] = self._loads(self.career_logs.get(addr, ""), [])[-50:]
