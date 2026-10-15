@@ -10,6 +10,14 @@ export interface PlayerProfile {
   duel_wins: number;
   safety_flags: number;
   balance: number;
+  duel_losses?: number;
+  duel_draws?: number;
+  remix_count?: number;
+  tournament_wins?: number;
+  tournament_finalists?: number;
+  challenge_count?: number;
+  verdict_count?: number;
+  badges?: string[];
 }
 
 export type SafetyClass =
@@ -96,7 +104,7 @@ export type AnyVerdict = CaptionVerdict | RoastVerdict | DuelVerdict | ChaosVerd
 
 export interface Submission {
   id: string;
-  type: "caption" | "roast" | "chaos";
+  type: "caption" | "roast" | "chaos" | "remix";
   round_id?: string;
   author: string;
   text: string;
@@ -105,6 +113,12 @@ export interface Submission {
   verdict: AnyVerdict | null;
   balance_delta: number;
   created_at: number;
+  source_id?: string;
+  source_author?: string;
+  finalized?: boolean;
+  challenged?: boolean;
+  challenge_eligible_until?: number;
+  transaction_hash?: string;
 }
 
 export interface Duel {
@@ -115,9 +129,15 @@ export interface Duel {
   entry_a: string;
   player_b: string | null;
   entry_b: string | null;
-  status: "waiting" | "ready" | "resolving" | "resolved";
+  status: "waiting" | "reveal" | "ready" | "resolving" | "resolved" | "expired" | "cancelled";
   verdict: DuelVerdict | null;
   created_at: number;
+  reveal_a?: boolean;
+  reveal_b?: boolean;
+  join_deadline?: number;
+  reveal_deadline?: number;
+  challenge_eligible_until?: number;
+  challenged?: boolean;
 }
 
 export interface Prompt {
@@ -126,6 +146,9 @@ export interface Prompt {
   author: string;
   active: boolean;
   created_at: number;
+  expires_at?: number;
+  moderation?: string;
+  moderation_verdict?: Record<string, unknown>;
 }
 
 export interface ChaosEvent {
@@ -156,6 +179,30 @@ export interface ProtocolStats {
   total_duels: number;
   total_chaos_actions: number;
   total_profiles: number;
+  total_prompts?: number;
+  total_remixes?: number;
+  total_challenges?: number;
+  total_tournaments?: number;
+  finalized_verdicts?: number;
+}
+
+export interface Career extends PlayerProfile {
+  recent_events: Array<{ kind: string; result_id: string; delta: number; timestamp: number }>;
+  season_points: number;
+}
+
+export interface Tournament {
+  id: string;
+  prompt_id: string;
+  prompt_text: string;
+  players: Array<{ address: string; entry: string }>;
+  matches: Array<Record<string, unknown>>;
+  stage: string;
+  status: string;
+  starts_at: number;
+  deadline: number;
+  season: string;
+  finalized: boolean;
 }
 
 export interface ConsoleTrace {

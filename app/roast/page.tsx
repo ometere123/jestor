@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ArenaShell from "@/components/layout/ArenaShell";
 import RoastInputPanel from "@/components/roast/RoastInputPanel";
 import RoastVerdictCard from "@/components/roast/RoastVerdictCard";
 import ConsensusTrace from "@/components/console/ConsensusTrace";
 import Badge from "@/components/ui/Badge";
 import { useWallet } from "@/lib/jestora/walletContext";
-import { submitRoastSelf, getProfile } from "@/lib/genlayer/contract";
+import { submitRoastSelf, getActivePrompts, getProfile } from "@/lib/genlayer/contract";
 import { logAction, saveLastVerdict, getTraces } from "@/lib/jestora/localCache";
 import { useRequireProfile } from "@/lib/jestora/useRequireProfile";
-import type { RoastVerdict, ConsoleTrace } from "@/lib/genlayer/types";
+import type { Prompt, RoastVerdict, ConsoleTrace } from "@/lib/genlayer/types";
 
 export default function RoastPage() {
   const { address } = useWallet();
@@ -20,9 +20,12 @@ export default function RoastPage() {
   const [error, setError] = useState("");
   const [traces, setTraces] = useState<ConsoleTrace[]>([]);
   const [txStatus, setTxStatus] = useState("");
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+
+  useEffect(() => { void getActivePrompts().then(setPrompts).catch(() => setPrompts([])); }, []);
 
   const handleSubmit = async (text: string) => {
-    if (!address || !profile) return;
+    if (!address || !profile || !prompts[0]) return;
     setIsLoading(true);
     setError("");
     setVerdict(null);
@@ -35,7 +38,7 @@ export default function RoastPage() {
       setTraces(getTraces());
       setTxStatus("Sending to GenLayer...");
 
-      const { verdict: receiptVerdict } = await submitRoastSelf(address, text);
+      const { verdict: receiptVerdict } = await submitRoastSelf(address, prompts[0].id, text);
       setTxStatus("Consensus reached. Reading verdict...");
 
       const updatedProfile = await getProfile(address);
@@ -83,6 +86,7 @@ export default function RoastPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="border-4 border-[#FF3B30] bg-white p-4 shadow-[4px_4px_0px_#121212]">
             <p className="text-xs font-black uppercase tracking-widest text-[#6B6257] mb-3">Submit Roast</p>
+            <p className="text-xs text-[#6B6257] mb-3">Prompt: {prompts[0]?.text ?? "No active on-chain prompt"}</p>
             <RoastInputPanel onSubmit={handleSubmit} isLoading={isLoading} />
             {error && <p className="text-xs text-[#FF3B30] mt-2">{error}</p>}
             {txStatus && (

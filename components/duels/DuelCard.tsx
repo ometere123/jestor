@@ -14,7 +14,7 @@ interface DuelCardProps {
 }
 
 export default function DuelCard({ duel, currentAddress, onJoin, onResolve, isLoading }: DuelCardProps) {
-  const isPlayerA = duel.player_a === currentAddress;
+  const isPlayerA = duel.player_a.toLowerCase() === currentAddress.toLowerCase();
   const canJoin = duel.status === "waiting" && !isPlayerA;
   const canResolve = duel.status === "ready";
 
