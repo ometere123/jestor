@@ -101,6 +101,9 @@ class JestoraArena(gl.Contract):
     def _addr(self) -> str:
         return str(gl.message.sender_address).lower()
 
+    def _contract(self) -> str:
+        return str(gl.message.contract_address).lower()
+
     def _address(self, value) -> str:
         return str(value).lower()
 
@@ -116,7 +119,7 @@ class JestoraArena(gl.Contract):
 
     def _duel_id(self, prompt_id: str, addr: str, client_nonce: str) -> str:
         return hashlib.sha256(
-            f"{self.DUEL_DOMAIN}|{self.CHAIN_ID}|{self.CONTRACT_DOMAIN}|"
+            f"{self.DUEL_DOMAIN}|{self.CHAIN_ID}|{self._contract()}|{self.CONTRACT_DOMAIN}|"
             f"{prompt_id}|{addr}|{client_nonce}".encode()
         ).hexdigest()[:24]
 
@@ -701,7 +704,7 @@ not transformative. The allowed decision must follow the score thresholds."""
 
     # -------------------------- sealed duels ---------------------------
     def _commit(self, duel_id: str, prompt_id: str, addr: str, entry: str, salt: str) -> str:
-        return hashlib.sha256(f"{self.DUEL_DOMAIN}|{self.CHAIN_ID}|{self.CONTRACT_DOMAIN}|{duel_id}|{prompt_id}|{addr}|{salt}|{entry}".encode()).hexdigest()
+        return hashlib.sha256(f"{self.DUEL_DOMAIN}|{self.CHAIN_ID}|{self._contract()}|{self.CONTRACT_DOMAIN}|{duel_id}|{prompt_id}|{addr}|{salt}|{entry}".encode()).hexdigest()
 
     def _commit_ok(self, value: str) -> bool:
         if not isinstance(value, str) or len(value) != 64: return False

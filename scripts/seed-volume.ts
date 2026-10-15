@@ -106,14 +106,14 @@ async function ensureProfile(player: Player) {
 
 function duelId(promptId: string, addressValue: string, nonce: string): string {
   return createHash("sha256")
-    .update("JESTOR-DUEL-V4|61999|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|" + promptId + "|" + addressValue.toLowerCase() + "|" + nonce)
+    .update("JESTOR-DUEL-V4|61999|" + address.toLowerCase() + "|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|" + promptId + "|" + addressValue.toLowerCase() + "|" + nonce)
     .digest("hex")
     .slice(0, 24);
 }
 
 function commitment(id: string, promptId: string, addressValue: string, entry: string, salt: string): string {
   return createHash("sha256")
-    .update("JESTOR-DUEL-V4|61999|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|" + id + "|" + promptId + "|" + addressValue.toLowerCase() + "|" + salt + "|" + entry.trim())
+    .update("JESTOR-DUEL-V4|61999|" + address.toLowerCase() + "|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|" + id + "|" + promptId + "|" + addressValue.toLowerCase() + "|" + salt + "|" + entry.trim())
     .digest("hex");
 }
 

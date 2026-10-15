@@ -135,20 +135,20 @@ export function randomSecret(bytes = 24): string {
   return Array.from(data, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-export function duelIdFor(promptId: string, address: string, clientNonce: string): string {
-  const payload = [DUEL_DOMAIN, String(ARENA_CHAIN_ID), ARENA_CONTRACT_DOMAIN, promptId, address.toLowerCase(), clientNonce].join("|");
+export function duelIdFor(contract: string, promptId: string, address: string, clientNonce: string): string {
+  const payload = [DUEL_DOMAIN, String(ARENA_CHAIN_ID), contract.toLowerCase(), ARENA_CONTRACT_DOMAIN, promptId, address.toLowerCase(), clientNonce].join("|");
   return sha256(toBytes(payload)).slice(2, 26);
 }
 
-export function duelCommitment(duelId: string, promptId: string, address: string, entry: string, salt: string): string {
-  const payload = [DUEL_DOMAIN, String(ARENA_CHAIN_ID), ARENA_CONTRACT_DOMAIN, duelId, promptId, address.toLowerCase(), salt, entry.trim()].join("|");
+export function duelCommitment(contract: string, duelId: string, promptId: string, address: string, entry: string, salt: string): string {
+  const payload = [DUEL_DOMAIN, String(ARENA_CHAIN_ID), contract.toLowerCase(), ARENA_CONTRACT_DOMAIN, duelId, promptId, address.toLowerCase(), salt, entry.trim()].join("|");
   return sha256(toBytes(payload)).slice(2);
 }
 
 export function createDuelDraft(contract: string, participant: string, promptId: string, entry: string): DuelDraft {
   const clientNonce = randomSecret(24);
   const salt = randomSecret(24);
-  const duelId = duelIdFor(promptId, participant, clientNonce);
+  const duelId = duelIdFor(contract, promptId, participant, clientNonce);
   return {
     version: 4,
     chainId: ARENA_CHAIN_ID,
@@ -159,7 +159,7 @@ export function createDuelDraft(contract: string, participant: string, promptId:
     role: "A",
     entry: entry.trim(),
     salt,
-    commitment: duelCommitment(duelId, promptId, participant, entry, salt),
+    commitment: duelCommitment(contract, duelId, promptId, participant, entry, salt),
     clientNonce,
     phase: "committed",
     createdAt: Date.now(),
@@ -178,7 +178,7 @@ export function createJoinDraft(contract: string, participant: string, duelId: s
     role: "B",
     entry: entry.trim(),
     salt,
-    commitment: duelCommitment(duelId, promptId, participant, entry, salt),
+    commitment: duelCommitment(contract, duelId, promptId, participant, entry, salt),
     phase: "joined",
     createdAt: Date.now(),
   };

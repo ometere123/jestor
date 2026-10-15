@@ -85,7 +85,7 @@ For chain `61999`, logical contract domain
 `JESTOR-ARENA-CIRCUIT-V4-STUDIONET`, duel ID D, prompt P, participant
 A, salt S, and trimmed entry E, the commitment is:
 
-`sha256("JESTOR-DUEL-V4|61999|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|D|P|A|S|E")`
+`sha256("JESTOR-DUEL-V4|61999|CONTRACT|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|D|P|A|S|E")`
 
 Player A first commits with a client nonce. Player B must join before either
 player can reveal. Entries remain empty in public reads until both valid

@@ -94,13 +94,25 @@ function receiptSummary(output) {
   return `status=${status} result=${result} leader=${receiptEvidence(output).leaderExecution ?? "unknown"} votes=${votes.join(",") || "unknown"}`;
 }
 
+function receiptResultName(output) {
+  return output.match(/result_name:\s*['"]([^'"]+)['"]/i)?.[1]?.toUpperCase()
+    ?? (output.match(/result:\s*(\d+)/i)?.[1] === "6" ? "MAJORITY_AGREE" : "unknown");
+}
+
 async function write(accountName, method, args = [], options = {}) {
   await selectAccount(accountName);
   const output = await cli(["write", CONTRACT, method, "--rpc", RPC, "--args", ...args]);
   const hash = extractHash(output);
   const receipt = await cli(["receipt", hash, "--rpc", RPC, "--status", "FINALIZED"]);
   const evidence = receiptEvidence(receipt);
-  if (!evidence.finalized || !evidence.majority) throw new Error(`${method} did not reach FINALIZED / MAJORITY_AGREE (${hash}; ${receiptSummary(receipt)}).`);
+  const resultName = receiptResultName(receipt);
+  if (!evidence.finalized) throw new Error(`${method} did not reach FINALIZED (${hash}; ${receiptSummary(receipt)}).`);
+  if (options.retryOnDisagreement && resultName === "MAJORITY_DISAGREE") {
+    negativeTransactions.push({ method, hash, finality: "FINALIZED", consensus: resultName, execution: "NOT_APPLIED" });
+    console.log(`PASS finalized semantic disagreement (state unchanged) ${method} ${hash}`);
+    return { hash, receipt, evidence, disagreement: true };
+  }
+  if (!evidence.majority) throw new Error(`${method} did not reach FINALIZED / MAJORITY_AGREE (${hash}; ${receiptSummary(receipt)}).`);
   if (options.expectError) {
     if (!evidence.error || evidence.success) throw new Error(`${method} was not a finalized contract rejection.`);
     negativeTransactions.push({ method, hash, finality: "FINALIZED", consensus: "MAJORITY_AGREE", execution: "ERROR" });
@@ -112,6 +124,18 @@ async function write(accountName, method, args = [], options = {}) {
   transactions.push({ method, hash, finality: "FINALIZED", consensus: "MAJORITY_AGREE", execution: "SUCCESS" });
   console.log(`PASS ${method} ${hash}`);
   return { hash, receipt, evidence };
+}
+
+async function writeUntilAgreement(accountName, method, args = [], attempts = 3) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const result = await write(accountName, method, args, { retryOnDisagreement: true });
+    if (!result.disagreement) return result;
+    if (attempt < attempts) {
+      console.log(`Retrying ${method} after finalized semantic disagreement (${attempt}/${attempts}).`);
+      await sleep(5000);
+    }
+  }
+  throw new Error(`${method} exhausted ${attempts} finalized disagreement retries.`);
 }
 
 async function read(method, args = []) {
@@ -133,11 +157,11 @@ async function read(method, args = []) {
 }
 
 function duelId(promptId, address, nonce) {
-  return createHash("sha256").update(`JESTOR-DUEL-V4|61999|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|${promptId}|${address.toLowerCase()}|${nonce}`).digest("hex").slice(0, 24);
+  return createHash("sha256").update(`JESTOR-DUEL-V4|61999|${CONTRACT.toLowerCase()}|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|${promptId}|${address.toLowerCase()}|${nonce}`).digest("hex").slice(0, 24);
 }
 
 function commitment(id, promptId, address, entry, salt) {
-  return createHash("sha256").update(`JESTOR-DUEL-V4|61999|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|${id}|${promptId}|${address.toLowerCase()}|${salt}|${entry.trim()}`).digest("hex");
+  return createHash("sha256").update(`JESTOR-DUEL-V4|61999|${CONTRACT.toLowerCase()}|JESTOR-ARENA-CIRCUIT-V4-STUDIONET|${id}|${promptId}|${address.toLowerCase()}|${salt}|${entry.trim()}`).digest("hex");
 }
 
 async function waitUntil(timestamp, label) {
@@ -259,7 +283,7 @@ export async function runSmoke() {
     if (hidden.entry_a || hidden.entry_b) throw new Error("Duel entries exposed before reveals.");
     await write(names[0], "reveal_duel_entry", [duel, entryA, saltA]);
     await write(names[1], "reveal_duel_entry", [duel, entryB, saltB]);
-    await write(names[2], "resolve_duel", [duel]);
+    await writeUntilAgreement(names[2], "resolve_duel", [duel]);
     const resolved = await read("get_duel", [duel]);
     if (!resolved.finalized || !resolved.entry_a || !resolved.entry_b) throw new Error("Duel did not settle.");
   }
@@ -267,25 +291,34 @@ export async function runSmoke() {
   // Consensus latency can exceed the nominal registration lead; leave a
   // bounded margin so a valid scheduled tournament is not rejected merely
   // because create_tournament finalized near the deadline.
-  const startsAt = Math.floor(Date.now() / 1000) + 300;
-  await write(names[0], "create_tournament", [prompt.id, String(startsAt)]);
-  const open = await read("get_open_tournaments");
-  const tournament = open.find((item) => item?.starts_at === startsAt) ?? open[0];
-  if (!tournament?.id) throw new Error("Tournament was not indexed.");
-  const circuitEntries = [
-    "The librarian turns a moon-goose parade into a precise comedy appeal, complete with a teacup referee who stamps every punchline guilty of fowl play.",
-    "I like jokes.",
-    "A moon goose cross-examines the teacup referee, files the punchline under absurd jurisprudence, and wins applause from the entire library parade.",
-    "I am a potato.",
-  ];
-  for (let index = 0; index < 4; index += 1) await write(names[index], "join_tournament", [tournament.id, `${circuitEntries[index]} ${tag}`]);
-  await waitUntil(startsAt + 2, "scheduled tournament start");
-  await write(names[3], "settle_tournament_match", [tournament.id, "0"]);
-  await write(names[3], "settle_tournament_match", [tournament.id, "1"]);
+  let tournament;
+  if (process.env.GL_TOURNAMENT_ID) {
+    tournament = await read("get_tournament", [process.env.GL_TOURNAMENT_ID]);
+    if (!tournament?.id || tournament.prompt_id !== prompt.id || tournament.players?.length !== 4 || tournament.finalized) {
+      throw new Error("Tournament override is not an open four-player tournament for the selected prompt.");
+    }
+    console.log(`PASS reuse indexed tournament ${tournament.id}`);
+  } else {
+    const startsAt = Math.floor(Date.now() / 1000) + 300;
+    await write(names[0], "create_tournament", [prompt.id, String(startsAt)]);
+    const open = await read("get_open_tournaments");
+    tournament = open.find((item) => item?.starts_at === startsAt) ?? open[0];
+    if (!tournament?.id) throw new Error("Tournament was not indexed.");
+    const circuitEntries = [
+      "The librarian turns a moon-goose parade into a precise comedy appeal, complete with a teacup referee who stamps every punchline guilty of fowl play.",
+      "I like jokes.",
+      "A moon goose cross-examines the teacup referee, files the punchline under absurd jurisprudence, and wins applause from the entire library parade.",
+      "I am a potato.",
+    ];
+    for (let index = 0; index < 4; index += 1) await write(names[index], "join_tournament", [tournament.id, `${circuitEntries[index]} ${tag}`]);
+  }
+  await waitUntil(Number(tournament.starts_at) + 2, "scheduled tournament start");
+  await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "0"]);
+  await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "1"]);
   const semis = await read("get_tournament", [tournament.id]);
   if (semis.finalized || semis.matches?.[0]?.status === "pending" || semis.matches?.[1]?.status === "pending") throw new Error("Semifinal settlement/progression failed.");
   await waitUntil(Math.max(semis.matches[0].challenge_eligible_until, semis.matches[1].challenge_eligible_until) + 1, "semifinal challenge windows");
-  await write(names[3], "settle_tournament_match", [tournament.id, "2"]);
+  await writeUntilAgreement(names[3], "settle_tournament_match", [tournament.id, "2"]);
   const afterFinal = await read("get_tournament", [tournament.id]);
   if (afterFinal.finalized) throw new Error("Finalized before the final challenge window closed.");
   await waitUntil(afterFinal.matches[2].challenge_eligible_until + 1, "final challenge window");

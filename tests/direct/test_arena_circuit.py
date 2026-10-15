@@ -12,13 +12,13 @@ def address(raw: bytes) -> str:
     return "0x" + raw.hex()
 
 
-def duel_id(prompt_id: str, account: bytes, nonce: str) -> str:
-    payload = f"{DUEL_DOMAIN}|61999|{DOMAIN}|{prompt_id}|{address(account).lower()}|{nonce}"
+def duel_id(prompt_id: str, account: bytes, nonce: str, contract: str) -> str:
+    payload = f"{DUEL_DOMAIN}|61999|{contract.lower()}|{DOMAIN}|{prompt_id}|{address(account).lower()}|{nonce}"
     return hashlib.sha256(payload.encode()).hexdigest()[:24]
 
 
-def commit(duel: str, prompt_id: str, account: bytes, entry: str, salt: str) -> str:
-    payload = f"{DUEL_DOMAIN}|61999|{DOMAIN}|{duel}|{prompt_id}|{address(account).lower()}|{salt}|{entry.strip()}"
+def commit(duel: str, prompt_id: str, account: bytes, entry: str, salt: str, contract: str) -> str:
+    payload = f"{DUEL_DOMAIN}|61999|{contract.lower()}|{DOMAIN}|{duel}|{prompt_id}|{address(account).lower()}|{salt}|{entry.strip()}"
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -156,9 +156,10 @@ def test_sealed_duel_commitment_identity_binding_and_replay_protection(direct_vm
     prompt_id = create_prompt(arena, direct_vm, direct_alice)
 
     entry_a, salt_a, nonce = "A deterministic joke about pending blocks", "salt-alice-001", "nonce-alice-00000001"
-    expected_duel = duel_id(prompt_id, direct_alice, nonce)
+    contract_address = arena._contract()
+    expected_duel = duel_id(prompt_id, direct_alice, nonce, contract_address)
     direct_vm.sender = direct_alice
-    duel_id_value = arena.start_duel(prompt_id, commit(expected_duel, prompt_id, direct_alice, entry_a, salt_a), nonce)
+    duel_id_value = arena.start_duel(prompt_id, commit(expected_duel, prompt_id, direct_alice, entry_a, salt_a, contract_address), nonce)
     assert duel_id_value == expected_duel
 
     with direct_vm.expect_revert("Reveal window closed"):
@@ -166,7 +167,7 @@ def test_sealed_duel_commitment_identity_binding_and_replay_protection(direct_vm
 
     direct_vm.sender = direct_bob
     entry_b, salt_b = "A validator asks the block to try again", "salt-bob-001"
-    arena.join_duel(duel_id_value, commit(duel_id_value, prompt_id, direct_bob, entry_b, salt_b))
+    arena.join_duel(duel_id_value, commit(duel_id_value, prompt_id, direct_bob, entry_b, salt_b, contract_address))
     with direct_vm.expect_revert("joined duel cannot be cancelled"):
         direct_vm.sender = direct_alice
         arena.cancel_duel(duel_id_value)
