@@ -94,11 +94,11 @@ successful write.
 | --- | --- |
 | GenVM lint | `genvm-linter==0.11.0`, 3 checks passed |
 | Direct Mode | 21 passed |
-| Frontend unit | 7 passed |
+| Frontend unit | 10 passed, including navigation regression coverage |
 | ESLint | passed with `--max-warnings=0` |
 | TypeScript | passed |
 | Production build | passed; 14 routes |
-| Playwright local browser smoke | 2 passed, live test skipped without provider |
+| Playwright local browser smoke | 5 passed, live test skipped without provider |
 | Production dependency audit | `npm audit --omit=dev`: 0 vulnerabilities |
 | Live CLI Studionet smoke | completed; all positive writes finalized and authoritative readback passed |
 
@@ -114,20 +114,16 @@ provider-dependent test.
 | Field | Verified value |
 | --- | --- |
 | Project | `delealufejoel-4184s-projects/jestor` |
-| Deployment | `dpl_ESybnXTRQf5iv3TFqNohbofT5tHv` |
-| Inspect URL | `https://vercel.com/delealufejoel-4184s-projects/jestor/ESybnXTRQf5iv3TFqNohbofT5tHv` |
+| Deployment URL | `https://jestor-5avjq7ov5-delealufejoel-4184s-projects.vercel.app` |
+| Inspect URL | `https://vercel.com/delealufejoel-4184s-projects/jestor/GGiYVHT9zyJxgdxUUHWKKEEna2v1` |
 | Production alias | `https://jestor.vercel.app` |
-| Ready state | `READY` |
-| Effective public contract bundle check | new address present, old address absent |
-| Effective public RPC bundle check | `https://studio.genlayer.com/api` present |
-| Wallet bundle check | `window.ethereum` provider path present |
-| Build/deployment smoke | Homepage and `/verdict/final-release-smoke` returned HTTP 200 immediately after the corrected deployment was built; served bundles contained the new contract, Studionet RPC, chain `61999`, and injected `window.ethereum` support |
-| Latest public edge check | On `2026-10-16T00:46:59+01:00`, both `https://jestor.vercel.app` and the deployment URL returned HTTP 402 `Payment required / DEPLOYMENT_DISABLED` with Vercel request references `cpt1::wjgjw-1792108039451-ab14132f0fc1` and `cpt1::xkzzl-1792108039820-6f464c387d4e` |
+| Ready state | `READY` reported by the Vercel CLI |
+| Wallet verification | Project owner manually tested an injected EIP-1193 wallet |
+| Automated live-browser transaction | Not claimed; no injected provider was available in this test environment |
 
-Vercel Production and Preview values for contract address, chain ID, RPC, and
-`NEXT_PUBLIC_USE_MOCK_CONTRACT=false` were updated through the Vercel CLI before
-this deployment. The deployment remains `READY` in Vercel’s control plane,
-but its public edge is currently disabled by the provider, so production
-availability cannot be claimed until the project-level billing/enablement
-blocker is cleared. No browser transaction is claimed without a real injected
-provider.
+The owner-reported manual redeployment uses the existing production project;
+no new Vercel project or automatic Git deployment was created. The repository
+contains `vercel.json` with `git.deploymentEnabled: false` as a safeguard for
+any future Git integration. This repository setting does not retroactively
+change the hosted deployment. No browser transaction is counted as automated
+evidence without a real injected provider.

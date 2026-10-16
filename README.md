@@ -21,17 +21,17 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
 | Retrieved deployed source bytes | `93796` (raw Studionet response) |
 | Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` (LF-normalized) |
-| Production frontend | [jestor.vercel.app](https://jestor.vercel.app) (Vercel currently returns a provider-level `402 DEPLOYMENT_DISABLED`; see release evidence) |
+| Production frontend | [jestor.vercel.app](https://jestor.vercel.app) (current manual deployment; see release evidence) |
 
 The release is one cohesive state machine in
-[contract/jestor_arena.py](/C:/Users/USER/Desktop/NEW%20GENLAYER%20BUILDS/jestor/contract/jestor_arena.py).
-The corrected Vercel deployment built successfully and was bundle-verified,
-but the Vercel project is currently disabled at the provider edge: as of the
-final audit it returns HTTP 402 `DEPLOYMENT_DISABLED` even though the Vercel
-control plane reports the deployment `READY`. This is an external hosting
-account blocker; no contract or wallet claim treats that response as a live
-frontend smoke-test success. See [the release evidence](docs/release-evidence.md)
-for the deployment ID and exact verification state.
+[contract/jestor_arena.py](contract/jestor_arena.py). The current frontend is
+served from the existing Jestor Vercel project after a manual redeployment;
+the Vercel CLI reported the deployment ready and assigned it to the production
+alias. The project owner also manually verified an injected EIP-1193 wallet.
+That manual check is distinguished from the automated Playwright suite, which
+does not claim a live wallet transaction unless a real provider is available.
+See [the release evidence](docs/release-evidence.md) for the current frontend
+deployment record and historical provider incidents.
 The historical v0.2 deployment
 `0x148aEB21f9ED1aD76b38EDCC8d8c845b3E1F220A` remains a reference
 only. The superseded v0.4 candidate
@@ -72,6 +72,29 @@ historical records were silently migrated.
 8. Player Careers with wallet-linked finalized events, duel records, remix
    achievements, lifetime stats, bounded season standings, and derived
    non-transferable badges.
+
+## Frontend navigation
+
+The Arena shell exposes the same ten destinations in the desktop top
+navigation, the full sidebar, and the responsive mobile menu:
+
+| Label | Route |
+| --- | --- |
+| Dashboard | `/arena` |
+| Caption Rift | `/caption-rift` |
+| Roast Balance | `/roast` |
+| Meme Duels | `/duels` |
+| Chaos Lab | `/chaos-lab` |
+| Remix Battles | `/remix` |
+| Arena Circuit | `/circuit` |
+| Player Career | `/career` |
+| Leaderboard | `/leaderboard` |
+| Rules | `/rules` |
+
+These links come from one typed navigation definition, so labels, routes,
+icons, colors, and active-route styling stay aligned across menu surfaces.
+The sidebar has its own scroll region on short desktop viewports; the mobile
+menu is scrollable when the available height is smaller than the ten links.
 
 ## Independent judgment model
 
@@ -224,6 +247,12 @@ requires three real injected EIP-1193 accounts on chain `61999`; it fails
 closed when no provider is present and never substitutes simulated wallet
 transactions.
 
+The navigation regression suite is included in
+`npm run test:frontend:unit` and `tests/e2e/ui.spec.ts`. It checks the shared
+ten-route definition, the existence of every App Router page, desktop
+topbar/sidebar parity, mobile-menu parity, active routes, and successful local
+route responses.
+
 ## Deployment and source verification
 
 Verify the local tool and network before signing:
@@ -243,10 +272,20 @@ receipt is `FINALIZED`, execution succeeds, consensus is
 after documented newline normalization. Never expose CLI key material in logs
 or documentation.
 
+## Frontend release control
+
+The GitHub repository and the Jestor Vercel project are intentionally kept
+disconnected. The repository contains `vercel.json` with
+`git.deploymentEnabled: false` as a safeguard if Git integration is ever
+reintroduced; that file does not retroactively change an already-hosted
+deployment. GitHub Actions contains verification jobs only and no Vercel
+deploy command or deploy hook. Future frontend releases must be initiated
+manually by the project owner.
+
 ## Release evidence
 
 The final release record is maintained in
-[docs/release-evidence.md](/C:/Users/USER/Desktop/NEW%20GENLAYER%20BUILDS/jestor/docs/release-evidence.md).
+[docs/release-evidence.md](docs/release-evidence.md).
 It contains the corrected contract address, deployment transaction, local and
 retrieved source hashes, finalized integration transaction evidence, Git
 commit, Vercel deployment, and explicit limitations. Historical deployment

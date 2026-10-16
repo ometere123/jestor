@@ -3,38 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
-import {
-  LayoutDashboard,
-  MessageSquare,
-  Flame,
-  Swords,
-  Zap,
-  Trophy,
-  BookOpen,
-} from "lucide-react";
-
-const navItems = [
-  { href: "/arena", label: "Dashboard", icon: LayoutDashboard, color: "#0057FF" },
-  { href: "/caption-rift", label: "Caption Rift", icon: MessageSquare, color: "#35E36D" },
-  { href: "/roast", label: "Roast Balance", icon: Flame, color: "#FF3B30" },
-  { href: "/duels", label: "Meme Duels", icon: Swords, color: "#7A35FF" },
-  { href: "/chaos-lab", label: "Chaos Lab", icon: Zap, color: "#FF8BD1" },
-  { href: "/leaderboard", label: "Leaderboard", icon: Trophy, color: "#FFE600" },
-  { href: "/rules", label: "Rules", icon: BookOpen, color: "#C99A6B" },
-];
+import { ARENA_NAV_ITEMS, isArenaNavItemActive } from "./arenaNavigation";
 
 export default function ArenaSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden lg:flex flex-col w-52 shrink-0 border-r-4 border-[#121212] bg-[#FFF8E7] min-h-screen pt-6 pb-4">
-      <nav className="flex flex-col gap-1 px-3">
-        {navItems.map(({ href, label, icon: Icon, color }) => {
-          const active = pathname === href || pathname.startsWith(href + "/");
+    <aside className="hidden lg:flex h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] min-h-0 w-52 shrink-0 flex-col overflow-y-auto border-r-4 border-[#121212] bg-[#FFF8E7] pt-6 pb-4">
+      <nav aria-label="Arena navigation" className="flex flex-col gap-1 px-3">
+        {ARENA_NAV_ITEMS.map(({ href, label, icon: Icon, color }) => {
+          const active = isArenaNavItemActive(pathname, href);
           return (
             <Link
               key={href}
               href={href}
+              aria-current={active ? "page" : undefined}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 text-xs font-black uppercase tracking-wider border-2 transition-all",
                 active

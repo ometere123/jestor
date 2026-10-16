@@ -5,28 +5,18 @@ import { shortAddress } from "@/lib/jestora/format";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Zap, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { ARENA_NAV_ITEMS, isArenaNavItemActive } from "./arenaNavigation";
 
 type EthereumProvider = {
   request: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
 };
 
-const NAV_LINKS: [string, string][] = [
-  ["/arena", "Dashboard"],
-  ["/caption-rift", "Caption Rift"],
-  ["/roast", "Roast"],
-  ["/duels", "Duels"],
-  ["/chaos-lab", "Chaos Lab"],
-  ["/remix", "Remix"],
-  ["/circuit", "Circuit"],
-  ["/career", "Career"],
-  ["/leaderboard", "Scores"],
-  ["/rules", "Rules"],
-];
-
 export default function ArenaTopbar() {
   const { address, isConnected, isConnecting, connect, disconnect, chainId } = useWallet();
+  const pathname = usePathname();
   const targetChain = TARGET_CHAIN_ID;
   const onCorrectChain = chainId === targetChain;
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -70,24 +60,34 @@ export default function ArenaTopbar() {
         </Link>
 
         {/* Nav */}
-        <nav className="hidden md:flex items-center gap-1 text-xs font-black uppercase tracking-wider">
-          {NAV_LINKS.map(([href, label]) => (
+        <nav aria-label="Primary navigation" className="hidden xl:flex min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto text-xs font-black uppercase tracking-wider">
+          {ARENA_NAV_ITEMS.map(({ href, label }) => {
+            const active = isArenaNavItemActive(pathname, href);
+            return (
             <Link
               key={href}
               href={href}
-              className="px-2 py-1 hover:bg-[#121212] hover:text-[#FFE600] transition-colors border border-transparent hover:border-[#121212]"
+              aria-current={active ? "page" : undefined}
+              className={`shrink-0 whitespace-nowrap border px-2 py-1 transition-colors ${
+                active
+                  ? "border-[#121212] bg-[#121212] text-[#FFE600]"
+                  : "border-transparent hover:border-[#121212] hover:bg-[#121212] hover:text-[#FFE600]"
+              }`}
             >
               {label}
             </Link>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Mobile nav toggle */}
         <button
           type="button"
           aria-label={mobileNavOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileNavOpen}
+          aria-controls="arena-mobile-navigation"
           onClick={() => setMobileNavOpen((open) => !open)}
-          className="md:hidden shrink-0 border-2 border-[#121212] bg-[#FFE600] p-1.5 shadow-[2px_2px_0px_#121212] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
+          className="xl:hidden shrink-0 border-2 border-[#121212] bg-[#FFE600] p-1.5 shadow-[2px_2px_0px_#121212] active:translate-x-0.5 active:translate-y-0.5 active:shadow-none transition-all"
         >
           {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -135,17 +135,25 @@ export default function ArenaTopbar() {
 
       {/* Mobile nav panel */}
       {mobileNavOpen && (
-        <nav className="md:hidden flex flex-col border-t-2 border-[#121212] bg-[#FFE600] text-xs font-black uppercase tracking-wider">
-          {NAV_LINKS.map(([href, label]) => (
+        <nav id="arena-mobile-navigation" aria-label="Mobile navigation" className="xl:hidden flex max-h-[calc(100dvh-4rem)] flex-col overflow-y-auto border-t-2 border-[#121212] bg-[#FFE600] text-xs font-black uppercase tracking-wider">
+          {ARENA_NAV_ITEMS.map(({ href, label }) => {
+            const active = isArenaNavItemActive(pathname, href);
+            return (
             <Link
               key={href}
               href={href}
               onClick={() => setMobileNavOpen(false)}
-              className="px-4 py-3 border-b border-[#121212]/20 hover:bg-[#121212] hover:text-[#FFE600] transition-colors"
+              aria-current={active ? "page" : undefined}
+              className={`border-b border-[#121212]/20 px-4 py-3 transition-colors ${
+                active
+                  ? "bg-[#121212] text-[#FFE600]"
+                  : "hover:bg-[#121212] hover:text-[#FFE600]"
+              }`}
             >
               {label}
             </Link>
-          ))}
+            );
+          })}
         </nav>
       )}
     </header>
