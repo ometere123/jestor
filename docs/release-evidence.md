@@ -6,17 +6,13 @@ animations, submitted transaction hashes, or mock adapters as proof.
 
 ## Current corrective-pass status
 
-The current source includes the round-bound tournament challenge validator fix
-and compact ten-destination navigation. Local verification passed, but this
-corrective source is not yet deployed: all funded local CLI accounts are
-locked, no keystore password is available in the repository or process
-environment, and no deployment transaction was submitted. The working-tree
-source SHA-256 is
-`14845bd109bf472eb3c80c98fe59a1ad2dea04732f747e5cbb9f4ef5df606264`.
-The verified deployment below remains the previous deployed baseline; it must
-not be used as evidence that the corrective source is live.
+The round-bound tournament challenge validator fix is deployed and verified on
+Studionet. The deployment reached `FINALIZED` / `MAJORITY_AGREE` with leader
+execution `SUCCESS`, and the retrieved source matched the intended contract
+source. The compact ten-destination navigation remains a frontend source change
+and was not sent to Vercel in this pass.
 
-## Verified deployment baseline
+## Verified corrected deployment
 
 | Item | Value |
 | --- | --- |
@@ -25,21 +21,38 @@ not be used as evidence that the corrective source is live.
 | RPC | `https://studio.genlayer.com/api` |
 | Local CLI | `genlayer@0.39.1` |
 | GenVM linter | `genvm-linter==0.11.0` |
-| Contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
-| Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
+| Contract | `0xb5cA3140A8aF2137BA68bD27a0a6eaBb88F79055` |
+| Deployment transaction | `0xf999b11ec9ea74ad4cb41786c66150f2ab5fdbc19ea2cdd70192a5b97f7847e0` |
 | Deployment status | `FINALIZED`, `MAJORITY_AGREE`, leader `SUCCESS` |
-| Retrieved source bytes | `93796` (raw Studionet response) |
-| Retrieved source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
-| Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` (LF-normalized) |
+| Retrieved source bytes | `94686` (raw Studionet response) |
+| Retrieved source SHA-256 | `14845bd109bf472eb3c80c98fe59a1ad2dea04732f747e5cbb9f4ef5df606264` |
+| Canonical source bytes | `93322` (LF-normalized) |
+| Canonical source SHA-256 | `d7e9a8e9cac2261c65cf8d8bc6d88e35548608718158fd5ab30bcfe7a4f09c2f` (LF-normalized) |
+| Contract source commit | `ee531742bdb98d0ac9eb1a5f0a02499244de2a21` |
 
-The deployed source was retrieved from Studionet and compared with
-`contract/jestor_arena.py` after normalizing CRLF/LF line endings. The
-canonical LF bytes and SHA-256 matched exactly. The deployment is a new state
-baseline. Earlier deployments remain historical references and were not
-represented as migrated state. The immediately prior
+The deployed source was retrieved from Studionet with the repository-local
+GenLayer SDK and compared with `contract/jestor_arena.py`. The raw response
+bytes were identical to the working-tree bytes; LF normalization produced the
+canonical hash above. The deployment is a new state baseline because the prior
+contract had no secure upgrade path. Earlier deployments remain historical
+references and were not represented as migrated state. The immediately prior
 candidate `0x46D843ee0e405Aba61B81bb3eFF1C0D29eCD0a3C` was superseded after
 the second audit found that its bracket settlement path could deadlock before
-materializing a final; it is not the production address.
+materializing a final; it is not the corrected address.
+
+## Historical verified deployment baseline
+
+The immediately preceding verified contract remains preserved for historical
+state and receipt traceability:
+
+| Item | Historical value |
+| --- | --- |
+| Contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
+| Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
+| Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` |
+
+The historical integration tables below target the historical deployment and
+must not be read as post-deployment gameplay evidence for the corrected address.
 
 ## Local verification
 
@@ -74,10 +87,9 @@ missing-secrets reason. A later documentation-only commit records the
 provider-level hosting state below; the implementation evidence remains tied
 to `e6cc091`.
 
-The latest navigation and documentation correction was verified by GitHub
-Actions run
-[`38862298118`](https://github.com/ometere123/jestor/actions/runs/38862298118)
-on commit `285e4d0`. Its static/build/lint/Direct Mode job passed; the
+The latest corrective implementation was verified by GitHub Actions run
+[`38875172323`](https://github.com/ometere123/jestor/actions/runs/38875172323)
+on commit `ee531742`. Its static/build/lint/Direct Mode job passed; the
 secret-dependent Studionet job was skipped because the required repository
 secrets are not configured.
 
@@ -315,11 +327,11 @@ pages rely on finalized state and receipt verification.
 
 ## Current frontend release
 
-The final corrective deployment, five-wallet Studionet evidence, authoritative
-state readbacks, source hashes, and the production deployment are recorded in
-the [corrected deployment manifest](deployment-manifest.md). That manifest is
-the current release record; the older tables above are retained only for
-historical audit traceability and do not describe the production contract.
+The corrected contract deployment, source hashes, receipt evidence, and the
+historical integration records are recorded in the
+[corrected deployment manifest](deployment-manifest.md). The older gameplay
+tables above are retained only for historical audit traceability and do not
+describe state on the corrected contract.
 
 The existing Jestor Vercel project was manually redeployed after the earlier
 provider restriction was resolved. The deployment command reported `Ready` and
@@ -338,6 +350,8 @@ assigned the production alias:
 The manual wallet check is user-provided evidence and is intentionally
 separate from the automated Playwright suite. The repository change recorded
 in this release did not initiate a Vercel deployment, promotion, or rollback.
+The corrected Studionet contract was deployed separately; the hosted frontend
+was not changed and is not claimed here to reference the corrected address.
 
 ### Historical hosting blocker (resolved)
 

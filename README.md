@@ -17,29 +17,30 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | RPC | `https://studio.genlayer.com/api` |
 | CLI | repository-local `genlayer@0.39.1` |
 | GenVM linter | `genvm-linter==0.11.0` |
-| Verified Arena Circuit contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
-| Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
-| Retrieved deployed source bytes | `93796` (raw Studionet response) |
-| Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` (LF-normalized) |
-| Production frontend | [jestor.vercel.app](https://jestor.vercel.app) (current manual deployment; see release evidence) |
+| Verified corrected Arena Circuit contract | `0xb5cA3140A8aF2137BA68bD27a0a6eaBb88F79055` |
+| Deployment transaction | `0xf999b11ec9ea74ad4cb41786c66150f2ab5fdbc19ea2cdd70192a5b97f7847e0` |
+| Deployment receipt | `FINALIZED`, `MAJORITY_AGREE`, leader `SUCCESS` |
+| Retrieved deployed source bytes | `94686` (raw Studionet response) |
+| Retrieved source SHA-256 | `14845bd109bf472eb3c80c98fe59a1ad2dea04732f747e5cbb9f4ef5df606264` (raw) |
+| Canonical source bytes | `93322` (LF-normalized) |
+| Canonical source SHA-256 | `d7e9a8e9cac2261c65cf8d8bc6d88e35548608718158fd5ab30bcfe7a4f09c2f` (LF-normalized) |
+| Contract source commit | `ee531742bdb98d0ac9eb1a5f0a02499244de2a21` |
+| Production frontend | [jestor.vercel.app](https://jestor.vercel.app) (existing owner-managed deployment; not changed in this contract pass) |
 
-The table above records the last verified deployed contract baseline. This
-working tree contains an additional round-bound tournament challenge validator
-correction and compact ten-destination navigation polish. The correction passed
-local lint, Direct Mode, frontend, build, and Playwright verification, but it is
-not represented by the deployed address above until a funded CLI-managed
-Studionet account is unlocked and a new finalized deployment is verified. No
-new contract address or transaction is claimed in this state.
+The table above records the corrected deployment verified on Studionet. The
+retrieved source is byte-for-byte identical to the deployed working-tree source
+and matches after LF normalization. The corrected deployment starts a fresh
+state baseline because the prior contract had no secure upgrade path; existing
+historical state was not silently migrated.
 
 The release is one cohesive state machine in
-[contract/jestor_arena.py](contract/jestor_arena.py). The current frontend is
-served from the existing Jestor Vercel project after a manual redeployment;
-the Vercel CLI reported the deployment ready and assigned it to the production
-alias. The project owner also manually verified an injected EIP-1193 wallet.
-That manual check is distinguished from the automated Playwright suite, which
-does not claim a live wallet transaction unless a real provider is available.
-See [the release evidence](docs/release-evidence.md) for the current frontend
-deployment record and historical provider incidents.
+[contract/jestor_arena.py](contract/jestor_arena.py). The existing frontend is
+served from the owner-managed Jestor Vercel deployment documented in
+[the release evidence](docs/release-evidence.md); this corrective contract
+deployment did not invoke Vercel or change that hosted build. The project owner
+has manually verified an injected EIP-1193 wallet. That manual check is
+distinct from the automated Playwright suite, which does not claim a live wallet
+transaction unless a real provider is available.
 The historical v0.2 deployment
 `0x148aEB21f9ED1aD76b38EDCC8d8c845b3E1F220A` remains a reference
 only. The superseded v0.4 candidate
@@ -48,9 +49,10 @@ audit found its permissionless bracket path could deadlock before materializing
 the final, so it was not promoted. The previous verified v0.4 deployment
 `0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` and deployment transaction
 `0xb4cd1e0b64e154183349e571086584b356db3f7df2bcbe9f0f323f1f851b8e0e` are
-also retained as historical references. The corrected deployment above is a
-separate state baseline because no secure upgrade path was available; no
-historical records were silently migrated.
+also retained as historical references. The immediately preceding verified
+baseline `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` and transaction
+`0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` are
+historical as well. No historical records were silently migrated.
 
 ## Eight integrations
 
@@ -231,7 +233,7 @@ wallets. It switches the CLI account context for each write and never reads,
 exports, prints, or stores private keys:
 
 ```powershell
-$env:GL_CONTRACT = "0x3B7106e084F89EC2B6b01C27E2ada161B0728B36"
+$env:GL_CONTRACT = "0xb5cA3140A8aF2137BA68bD27a0a6eaBb88F79055"
 $env:CLI_ARENA_ACCOUNTS = "party_a,walletA,walletB,conveyance-deployer,party_b"
 node scripts/cli-wallet-smoke.mjs
 ```
@@ -261,17 +263,24 @@ ten-route definition, the existence of every App Router page, desktop
 topbar/sidebar parity, mobile-menu parity, active routes, and successful local
 route responses.
 
+The recorded five-wallet live gameplay run in the release evidence targets the
+previous contract address and is retained as historical integration evidence.
+The corrected deployment was verified independently through a read-only
+finalized receipt and deployed-source retrieval; no new multi-wallet gameplay
+run is claimed for it in this corrective pass.
+
 ## Deployment and source verification
 
 Verify the local tool and network before signing:
 
 ```powershell
 node_modules\.bin\genlayer.cmd --version
+node_modules\.bin\genlayer.cmd network set studionet
 node_modules\.bin\genlayer.cmd network info
 node_modules\.bin\genlayer.cmd account list
-node_modules\.bin\genlayer.cmd deploy --contract contract/jestor_arena.py --rpc https://studio.genlayer.com/api
+node_modules\.bin\genlayer.cmd deploy --contract contract/jestor_arena.py
 node_modules\.bin\genlayer.cmd receipt <deployment-transaction> --status FINALIZED
-node_modules\.bin\genlayer.cmd code <contract-address> --rpc https://studio.genlayer.com/api
+node_modules\.bin\genlayer.cmd code <contract-address>
 ```
 
 Deployment is accepted only when chain ID is `61999`, the deployment
@@ -295,6 +304,7 @@ manually by the project owner.
 The final release record is maintained in
 [docs/release-evidence.md](docs/release-evidence.md).
 It contains the corrected contract address, deployment transaction, local and
-retrieved source hashes, finalized integration transaction evidence, Git
-commit, Vercel deployment, and explicit limitations. Historical deployment
-records are not reused as evidence.
+retrieved source hashes, finalized deployment evidence, historical integration
+transaction evidence, Git commit, Vercel hosting status, and explicit
+limitations. Historical deployment records are not reused as evidence for the
+corrected contract.

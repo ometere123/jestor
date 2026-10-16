@@ -4,7 +4,7 @@ This manifest records only evidence produced by finalized receipts or
 authoritative `LATEST_FINAL` reads. It does not treat a submitted hash, a
 mock adapter, or a UI animation as proof.
 
-## Last verified contract deployment
+## Corrected contract deployment
 
 | Field | Verified value |
 | --- | --- |
@@ -13,38 +13,41 @@ mock adapter, or a UI animation as proof.
 | RPC | `https://studio.genlayer.com/api` |
 | Local CLI | `genlayer@0.39.1` |
 | Frontend runtime | Next.js `16.4.2`, viem `2.57.7` |
+| Contract | `0xb5cA3140A8aF2137BA68bD27a0a6eaBb88F79055` |
+| Deployment transaction | `0xf999b11ec9ea74ad4cb41786c66150f2ab5fdbc19ea2cdd70192a5b97f7847e0` |
+| Deployment receipt | `FINALIZED`, `MAJORITY_AGREE`, leader `SUCCESS` |
+| Retrieved source bytes | `94686` (raw response byte representation) |
+| Retrieved source SHA-256 | `14845bd109bf472eb3c80c98fe59a1ad2dea04732f747e5cbb9f4ef5df606264` |
+| Canonical Git source bytes | `93322` (LF blob) |
+| Canonical/deployed normalized SHA-256 | `d7e9a8e9cac2261c65cf8d8bc6d88e35548608718158fd5ab30bcfe7a4f09c2f` |
+| Canonical Git blob | `5abad1495f373c5d27896fe185486f37108b7a7e` |
+| Code commit containing deployed contract | `ee531742bdb98d0ac9eb1a5f0a02499244de2a21` |
+
+The source was retrieved from Studionet with the repository-local GenLayer
+SDK and compared with `contract/jestor_arena.py`. The raw response bytes were
+identical to the working-tree bytes; LF normalization produced the canonical
+`d7e9a8e9...f09c2f` hash shown above. This deployment is a fresh state baseline:
+the prior contract had no secure upgrade path and no historical state was
+silently migrated.
+
+## Historical previous deployment
+
+The immediately preceding verified contract remains preserved for historical
+state and receipt traceability:
+
+| Field | Historical value |
+| --- | --- |
 | Contract | `0x3B7106e084F89EC2B6b01C27E2ada161B0728B36` |
 | Deployment transaction | `0x4c47d0ece42a525d098d78cf8ce17b3cd8fb3c2e27b67bb310a781eeaad4cb4d` |
-| Deployment receipt | `FINALIZED`, `MAJORITY_AGREE`, leader `SUCCESS` |
-| Retrieved source bytes | `93796` (raw response byte representation) |
-| Retrieved source SHA-256 | `4329cf5f67e1ffb00edd98e457f2b7f261b4e8279c9f946fba858f74ba23cd40` |
-| Canonical Git source bytes | `92574` (LF blob) |
-| Canonical/deployed normalized SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` |
-| Canonical Git blob | `6bbe25764c37b28b0f5b70a6e5ee13cd32f8f6c7` |
-| Code commit containing deployed contract | `489cba3` |
-| Release commit containing deployed frontend | `b0503f0` |
+| Canonical normalized SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` |
 
-The retrieved source was compared with the release working source after
-normalizing CRLF/LF line endings; the canonical bytes and SHA-256 matched.
-This is the last verified deployment baseline. The current source correction
-has not been deployed yet because all funded local CLI accounts are locked and
-no keystore password is available in the repository or process environment;
-no deployment transaction was submitted for this corrective pass. The previous deployment
-`0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` remains a historical baseline;
-there is no automatic migration of its state.
+Its finalized gameplay receipts below are historical evidence for that address,
+not evidence that the corrected deployment inherited its state.
 
-## Pending corrective source
+## Historical finalized Studionet integration run for the previous deployment
 
-The source currently under test adds round-bound tournament challenge reward
-validation and compact, non-scrolling ten-item navigation. Its working-tree
-SHA-256 is `14845bd109bf472eb3c80c98fe59a1ad2dea04732f747e5cbb9f4ef5df606264`.
-It is not a deployed contract hash. A new address, deployment transaction,
-receipt, and retrieved-source comparison must be added here only after a
-Studionet `61999` deployment reaches `FINALIZED` / `MAJORITY_AGREE` / `SUCCESS`.
-
-## Finalized Studionet integration run for the verified baseline
-
-The run used five existing funded CLI-managed accounts:
+The historical run used five existing funded CLI-managed accounts against
+`0x3B7106e084F89EC2B6b01C27E2ada161B0728B36`:
 `party_a`, `walletA`, `walletB`, `conveyance-deployer`, and `party_b`.
 The runner checked chain ID `61999`, waited for `FINALIZED`, required
 `MAJORITY_AGREE` and leader `SUCCESS` for positive writes, and recorded
@@ -112,15 +115,18 @@ successful write.
 | Production build | passed; 14 routes |
 | Playwright local browser smoke | 5 passed, live test skipped without provider |
 | Production dependency audit | `npm audit --omit=dev`: 0 vulnerabilities |
-| GitHub Actions | [run 38862298118](https://github.com/ometere123/jestor/actions/runs/38862298118) passed static/build/lint/Direct Mode on `285e4d0`; secret-dependent Studionet job skipped without repository secrets |
-| Live CLI Studionet smoke | completed; all positive writes finalized and authoritative readback passed |
+| GitHub Actions | [run 38875172323](https://github.com/ometere123/jestor/actions/runs/38875172323) passed static/build/lint/Direct Mode on `ee531742`; secret-dependent Studionet job skipped without repository secrets |
+| Corrected deployment verification | receipt reached `FINALIZED` / `MAJORITY_AGREE` / leader `SUCCESS`; retrieved source matched the intended source hash |
+| Live CLI Studionet smoke | completed historically against the previous deployment; no new multi-wallet gameplay run is claimed for the corrected address |
 
 The live Playwright spec remains fail-closed and was not presented as executed
 evidence on this host because no real injected EIP-1193 wallet provider was
 available to the Playwright browser context. The genuine five-wallet CLI
-journey is the authoritative live transaction evidence. CI runs the local
-browser smoke on every push; the live browser journey remains an explicit
-provider-dependent test.
+journey is authoritative live transaction evidence for the historical address
+only. CI runs the local browser smoke on every push; the live browser journey
+remains an explicit provider-dependent test. The corrected address has
+deployment/source/receipt evidence but no newly claimed gameplay transaction
+set in this pass.
 
 ## Production frontend
 
@@ -135,7 +141,9 @@ provider-dependent test.
 | Automated live-browser transaction | Not claimed; no injected provider was available in this test environment |
 
 The owner-reported manual redeployment uses the existing production project;
-no new Vercel project or automatic Git deployment was created. The repository
+no new Vercel project or automatic Git deployment was created. This corrective
+contract deployment did not call Vercel, so the hosted frontend was not changed
+and is not claimed here to reference the corrected address. The repository
 contains `vercel.json` with `git.deploymentEnabled: false` as a safeguard for
 any future Git integration. This repository setting does not retroactively
 change the hosted deployment. No browser transaction is counted as automated
