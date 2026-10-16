@@ -100,6 +100,7 @@ successful write.
 | Production build | passed; 14 routes |
 | Playwright local browser smoke | 5 passed, live test skipped without provider |
 | Production dependency audit | `npm audit --omit=dev`: 0 vulnerabilities |
+| GitHub Actions | [run 38862298118](https://github.com/ometere123/jestor/actions/runs/38862298118) passed static/build/lint/Direct Mode on `285e4d0`; secret-dependent Studionet job skipped without repository secrets |
 | Live CLI Studionet smoke | completed; all positive writes finalized and authoritative readback passed |
 
 The live Playwright spec remains fail-closed and was not presented as executed

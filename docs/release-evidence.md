@@ -62,6 +62,13 @@ missing-secrets reason. A later documentation-only commit records the
 provider-level hosting state below; the implementation evidence remains tied
 to `e6cc091`.
 
+The latest navigation and documentation correction was verified by GitHub
+Actions run
+[`38862298118`](https://github.com/ometere123/jestor/actions/runs/38862298118)
+on commit `285e4d0`. Its static/build/lint/Direct Mode job passed; the
+secret-dependent Studionet job was skipped because the required repository
+secrets are not configured.
+
 The direct suite covers deterministic invariants and adversarial leader
 outputs. Direct Mode does not itself prove validator agreement; that evidence
 comes from the finalized Studionet receipts below.
