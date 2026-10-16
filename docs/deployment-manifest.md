@@ -4,7 +4,7 @@ This manifest records only evidence produced by finalized receipts or
 authoritative `LATEST_FINAL` reads. It does not treat a submitted hash, a
 mock adapter, or a UI animation as proof.
 
-## Contract deployment
+## Last verified contract deployment
 
 | Field | Verified value |
 | --- | --- |
@@ -26,11 +26,23 @@ mock adapter, or a UI animation as proof.
 
 The retrieved source was compared with the release working source after
 normalizing CRLF/LF line endings; the canonical bytes and SHA-256 matched.
-The previous deployment
+This is the last verified deployment baseline. The current source correction
+has not been deployed yet because all funded local CLI accounts are locked and
+no keystore password is available in the repository or process environment;
+no deployment transaction was submitted for this corrective pass. The previous deployment
 `0x2e23BBA29011dB9Fd001ce0e0A234BB90974Bbd7` remains a historical baseline;
 there is no automatic migration of its state.
 
-## Finalized Studionet integration run
+## Pending corrective source
+
+The source currently under test adds round-bound tournament challenge reward
+validation and compact, non-scrolling ten-item navigation. Its working-tree
+SHA-256 is `14845bd109bf472eb3c80c98fe59a1ad2dea04732f747e5cbb9f4ef5df606264`.
+It is not a deployed contract hash. A new address, deployment transaction,
+receipt, and retrieved-source comparison must be added here only after a
+Studionet `61999` deployment reaches `FINALIZED` / `MAJORITY_AGREE` / `SUCCESS`.
+
+## Finalized Studionet integration run for the verified baseline
 
 The run used five existing funded CLI-managed accounts:
 `party_a`, `walletA`, `walletB`, `conveyance-deployer`, and `party_b`.
@@ -93,7 +105,7 @@ successful write.
 | Check | Result |
 | --- | --- |
 | GenVM lint | `genvm-linter==0.11.0`, 3 checks passed |
-| Direct Mode | 21 passed |
+| Direct Mode | 22 passed |
 | Frontend unit | 10 passed, including navigation regression coverage |
 | ESLint | passed with `--max-warnings=0` |
 | TypeScript | passed |

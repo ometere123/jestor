@@ -23,6 +23,14 @@ entries, monetary prizes, backend services, databases, or Cloudflare Workers.
 | Canonical source SHA-256 | `25ac8add8adbcc9d77df40ef0437e9adafdbd89d1615a11da3e6e37802298847` (LF-normalized) |
 | Production frontend | [jestor.vercel.app](https://jestor.vercel.app) (current manual deployment; see release evidence) |
 
+The table above records the last verified deployed contract baseline. This
+working tree contains an additional round-bound tournament challenge validator
+correction and compact ten-destination navigation polish. The correction passed
+local lint, Direct Mode, frontend, build, and Playwright verification, but it is
+not represented by the deployed address above until a funded CLI-managed
+Studionet account is unlocked and a new finalized deployment is verified. No
+new contract address or transaction is claimed in this state.
+
 The release is one cohesive state machine in
 [contract/jestor_arena.py](contract/jestor_arena.py). The current frontend is
 served from the existing Jestor Vercel project after a manual redeployment;

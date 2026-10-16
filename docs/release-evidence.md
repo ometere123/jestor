@@ -4,7 +4,19 @@ This file records evidence for the corrected Arena Circuit release. It is kept
 with the source so a reader can reproduce the checks without treating UI
 animations, submitted transaction hashes, or mock adapters as proof.
 
-## Verified deployment
+## Current corrective-pass status
+
+The current source includes the round-bound tournament challenge validator fix
+and compact ten-destination navigation. Local verification passed, but this
+corrective source is not yet deployed: all funded local CLI accounts are
+locked, no keystore password is available in the repository or process
+environment, and no deployment transaction was submitted. The working-tree
+source SHA-256 is
+`14845bd109bf472eb3c80c98fe59a1ad2dea04732f747e5cbb9f4ef5df606264`.
+The verified deployment below remains the previous deployed baseline; it must
+not be used as evidence that the corrective source is live.
+
+## Verified deployment baseline
 
 | Item | Value |
 | --- | --- |
@@ -34,7 +46,7 @@ materializing a final; it is not the production address.
 The release candidate passed:
 
 - `genvm-lint contract/jestor_arena.py`: 3 checks passed.
-- `npm run test:direct`: 21 Direct Mode tests passed.
+- `npm run test:direct`: 22 Direct Mode tests passed.
 - `npm run test:frontend:unit`: 10 frontend unit tests passed, including the
   shared navigation regression tests.
 - `npm run lint`: passed.

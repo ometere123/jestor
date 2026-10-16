@@ -9,14 +9,14 @@ describe("Arena navigation contract", () => {
     expect(new Set(ARENA_NAV_ITEMS.map((item) => item.href)).size).toBe(10);
     expect(ARENA_NAV_ITEMS.map((item) => item.label)).toEqual([
       "Dashboard",
-      "Caption Rift",
-      "Roast Balance",
-      "Meme Duels",
-      "Chaos Lab",
-      "Remix Battles",
-      "Arena Circuit",
-      "Player Career",
-      "Leaderboard",
+      "Caption",
+      "Roast",
+      "Duels",
+      "Chaos",
+      "Remix",
+      "Circuit",
+      "Career",
+      "Scores",
       "Rules",
     ]);
   });

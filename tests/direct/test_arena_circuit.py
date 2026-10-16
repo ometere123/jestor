@@ -263,6 +263,65 @@ def test_untrusted_data_cannot_escape_judgment_markers_and_challenge_shape_is_bo
     assert arena._challenge_shape_matches("submission", blocked_submission, blocked_keep) is True
 
 
+def test_tournament_challenge_rewards_are_round_bound_and_consensus_strict(direct_vm, direct_deploy, direct_alice):
+    arena = direct_deploy(CONTRACT)
+    for index, (winner_reward, loser_reward) in ((0, (20, 5)), (2, (40, 10))):
+        result = {
+            "index": index,
+            "verdict": {
+                "winner": "A",
+                "a_delta": winner_reward,
+                "b_delta": loser_reward,
+                "safety_class": "SAFE",
+            },
+        }
+        keep = {
+            "result_kind": "tournament",
+            "decision": "KEEP",
+            "new_delta": 0,
+            "new_a_delta": winner_reward,
+            "new_b_delta": loser_reward,
+            "new_winner": "A",
+            "new_safety_class": "SAFE",
+            "new_allowed": True,
+            "new_valid": True,
+            "reason": "Keep the settled round result.",
+        }
+        adjust = dict(keep, decision="ADJUST", reason="Reassess the settled round.")
+        block = dict(
+            keep,
+            decision="BLOCK",
+            new_a_delta=0,
+            new_b_delta=0,
+            new_winner="NO_CONTEST",
+            new_safety_class="UNSAFE",
+            new_allowed=False,
+            new_valid=False,
+            reason="Block an unsafe result.",
+        )
+        for verdict in (keep, adjust, block):
+            assert arena._valid("challenge", verdict) is True
+            assert arena._challenge_shape_matches("tournament", result, verdict) is True
+
+        # A semifinal must not accept final rewards, and neither round accepts
+        # arbitrary reward values even when both model outputs repeat them.
+        cross_round = dict(adjust, new_a_delta=40, new_b_delta=10)
+        arbitrary = dict(adjust, new_a_delta=30, new_b_delta=15)
+        assert arena._challenge_shape_matches("tournament", result, cross_round) is (index == 2)
+        assert arena._valid("challenge", arbitrary) is False
+        assert arena._challenge_shape_matches("tournament", result, arbitrary) is False
+
+        draw = dict(adjust, new_a_delta=0, new_b_delta=0, new_winner="DRAW")
+        assert arena._valid("challenge", draw) is True
+        assert arena._challenge_shape_matches("tournament", result, draw) is True
+        forged_draw = dict(draw, new_a_delta=winner_reward, new_b_delta=loser_reward)
+        assert arena._valid("challenge", forged_draw) is False
+
+        materially_disagreeing_validator = dict(adjust, new_winner="B", new_a_delta=loser_reward, new_b_delta=winner_reward)
+        assert arena._valid("challenge", materially_disagreeing_validator) is True
+        assert arena._agree("challenge", adjust, materially_disagreeing_validator) is False
+
+
 def test_challenge_is_substantive_idempotent_and_preserves_original_history(direct_vm, direct_deploy, direct_accounts):
     arena = direct_deploy(CONTRACT)
     author, challenger = direct_accounts[:2]

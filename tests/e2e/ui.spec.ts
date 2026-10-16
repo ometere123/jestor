@@ -15,27 +15,43 @@ test("renders a permanent verdict shell without treating missing chain data as e
   await expect(page.getByText(/verified finalized transaction/i)).toHaveCount(0);
 });
 
-test("keeps desktop sidebar and top navigation aligned", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 700 });
-  await page.goto("/arena");
-
+test("keeps the ten-item desktop navigation compact and free of horizontal overflow", async ({ page }) => {
   const expectedHrefs = ARENA_NAV_ITEMS.map((item) => item.href);
   const hrefs = async (selector: string) => page.locator(selector).evaluateAll((links) => links.map((link) => link.getAttribute("href")));
 
-  await expect(page.locator('nav[aria-label="Primary navigation"]')).toBeVisible();
-  await expect(page.locator('nav[aria-label="Arena navigation"]')).toBeVisible();
-  await expect(page.locator('nav[aria-label="Primary navigation"] a')).toHaveCount(expectedHrefs.length);
-  await expect(page.locator('nav[aria-label="Arena navigation"] a')).toHaveCount(expectedHrefs.length);
-  expect(await hrefs('nav[aria-label="Primary navigation"] a')).toEqual(expectedHrefs);
-  expect(await hrefs('nav[aria-label="Arena navigation"] a')).toEqual(expectedHrefs);
-  await expect(page.locator('nav[aria-label="Primary navigation"] a[href="/arena"]')).toHaveAttribute("aria-current", "page");
-  await expect(page.locator('nav[aria-label="Arena navigation"] a[href="/arena"]')).toHaveAttribute("aria-current", "page");
+  for (const width of [1280, 1366, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 700 });
+    await page.goto("/arena");
 
-  const primaryBox = await page.locator('nav[aria-label="Primary navigation"]').boundingBox();
-  const walletBox = await page.locator("header").getByRole("button", { name: "Connect Wallet" }).boundingBox();
-  expect(primaryBox).not.toBeNull();
-  expect(walletBox).not.toBeNull();
-  expect(primaryBox!.x + primaryBox!.width).toBeLessThanOrEqual(walletBox!.x);
+    const primaryNavigation = page.locator('nav[aria-label="Primary navigation"]');
+    const sidebarNavigation = page.locator('nav[aria-label="Arena navigation"]');
+    await expect(primaryNavigation).toBeVisible();
+    await expect(sidebarNavigation).toBeVisible();
+    await expect(primaryNavigation.locator("a")).toHaveCount(expectedHrefs.length);
+    await expect(sidebarNavigation.locator("a")).toHaveCount(expectedHrefs.length);
+    expect(await hrefs('nav[aria-label="Primary navigation"] a')).toEqual(expectedHrefs);
+    expect(await hrefs('nav[aria-label="Arena navigation"] a')).toEqual(expectedHrefs);
+    await expect(primaryNavigation.locator('a[href="/arena"]')).toHaveAttribute("aria-current", "page");
+    await expect(sidebarNavigation.locator('a[href="/arena"]')).toHaveAttribute("aria-current", "page");
+
+    const layout = await page.locator("header").evaluate((header) => {
+      const nav = header.querySelector('nav[aria-label="Primary navigation"]') as HTMLElement | null;
+      const wallet = [...header.querySelectorAll("button")].find((button) => button.textContent?.includes("Connect Wallet")) as HTMLElement | undefined;
+      return {
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+        navOverflowX: nav ? getComputedStyle(nav).overflowX : "missing",
+        navScrollWidth: nav?.scrollWidth ?? 0,
+        navClientWidth: nav?.clientWidth ?? 0,
+        navRight: nav?.getBoundingClientRect().right ?? 0,
+        walletLeft: wallet?.getBoundingClientRect().left ?? 0,
+      };
+    });
+    expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+    expect(layout.navOverflowX).not.toMatch(/auto|scroll/);
+    expect(layout.navScrollWidth).toBeLessThanOrEqual(layout.navClientWidth);
+    expect(layout.navRight).toBeLessThanOrEqual(layout.walletLeft);
+  }
 
   await page.setViewportSize({ width: 1440, height: 360 });
   await page.reload();
@@ -58,6 +74,11 @@ test("exposes the same ten destinations through the mobile menu", async ({ page 
   expect(await mobileNavigation.locator("a").evaluateAll((links) => links.map((link) => link.getAttribute("href")))).toEqual(
     ARENA_NAV_ITEMS.map((item) => item.href),
   );
+  const overflow = await page.evaluate(() => ({
+    documentWidth: document.documentElement.scrollWidth,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  expect(overflow.documentWidth).toBeLessThanOrEqual(overflow.viewportWidth);
 });
 
 test("serves every primary navigation route", async ({ page }) => {

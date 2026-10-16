@@ -9,8 +9,8 @@ export default function ArenaSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden lg:flex h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] min-h-0 w-52 shrink-0 flex-col overflow-y-auto border-r-4 border-[#121212] bg-[#FFF8E7] pt-6 pb-4">
-      <nav aria-label="Arena navigation" className="flex flex-col gap-1 px-3">
+    <aside className="hidden lg:flex h-[calc(100dvh-4rem)] max-h-[calc(100dvh-4rem)] min-h-0 w-48 shrink-0 flex-col overflow-y-auto border-r-4 border-[#121212] bg-[#FFF8E7] pt-4 pb-3">
+      <nav aria-label="Arena navigation" className="flex flex-col gap-0.5 px-2">
         {ARENA_NAV_ITEMS.map(({ href, label, icon: Icon, color }) => {
           const active = isArenaNavItemActive(pathname, href);
           return (
@@ -19,7 +19,7 @@ export default function ArenaSidebar() {
               href={href}
               aria-current={active ? "page" : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 text-xs font-black uppercase tracking-wider border-2 transition-all",
+                "flex items-center gap-2 px-2 py-2 text-[10px] font-black uppercase tracking-wide border-2 transition-all",
                 active
                   ? "border-[#121212] bg-[#121212] text-[#FFE600] shadow-[2px_2px_0px_#FFE600]"
                   : "border-transparent text-[#121212] hover:border-[#121212] hover:bg-white hover:shadow-[2px_2px_0px_#121212]"
@@ -32,7 +32,7 @@ export default function ArenaSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto px-3">
+      <div className="mt-auto px-2">
         <div className="border-2 border-dashed border-[#C99A6B] p-2 text-center">
           <p className="text-[10px] font-bold text-[#6B6257] leading-tight uppercase">
             Jest Points are toy balances. No financial value.

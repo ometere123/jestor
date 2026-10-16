@@ -6,7 +6,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, Menu, X } from "lucide-react";
+import { LogOut, Zap, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { ARENA_NAV_ITEMS, isArenaNavItemActive } from "./arenaNavigation";
 
@@ -48,19 +48,19 @@ export default function ArenaTopbar() {
 
   return (
     <header className="sticky top-0 z-50 border-b-4 border-[#121212] bg-[#FFE600] shadow-[0_4px_0px_#121212]">
-      <div className="mx-auto max-w-7xl flex items-center justify-between px-3 sm:px-4 py-2 gap-2 sm:gap-4 overflow-hidden">
+      <div className="mx-auto max-w-7xl flex items-center justify-between px-3 sm:px-4 py-1.5 gap-2 overflow-hidden">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 shrink-0 min-w-0">
-          <span className="font-['Rubik_Mono_One',monospace] text-lg sm:text-xl text-[#121212] tracking-tight truncate">
+        <Link href="/" className="flex items-center gap-1.5 shrink-0 min-w-0">
+          <span className="font-['Rubik_Mono_One',monospace] text-base sm:text-lg text-[#121212] tracking-tight truncate">
             JESTOR
           </span>
-          <span className="hidden sm:inline text-xs font-black uppercase bg-[#121212] text-[#FFE600] px-1.5 py-0.5 tracking-widest">
+          <span className="hidden sm:inline text-[10px] font-black uppercase bg-[#121212] text-[#FFE600] px-1 py-0.5 tracking-widest">
             ARENA
           </span>
         </Link>
 
         {/* Nav */}
-        <nav aria-label="Primary navigation" className="hidden xl:flex min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto text-xs font-black uppercase tracking-wider">
+        <nav aria-label="Primary navigation" className="hidden xl:flex min-w-0 flex-1 items-center justify-center gap-0.5 text-[10px] font-black uppercase tracking-wide whitespace-nowrap">
           {ARENA_NAV_ITEMS.map(({ href, label }) => {
             const active = isArenaNavItemActive(pathname, href);
             return (
@@ -68,7 +68,7 @@ export default function ArenaTopbar() {
               key={href}
               href={href}
               aria-current={active ? "page" : undefined}
-              className={`shrink-0 whitespace-nowrap border px-2 py-1 transition-colors ${
+              className={`flex-none border px-1.5 py-1 transition-colors ${
                 active
                   ? "border-[#121212] bg-[#121212] text-[#FFE600]"
                   : "border-transparent hover:border-[#121212] hover:bg-[#121212] hover:text-[#FFE600]"
@@ -118,10 +118,12 @@ export default function ArenaTopbar() {
                 variant="ghost"
                 size="sm"
                 onClick={disconnect}
-                className="!px-1.5 sm:!px-3 !text-[10px] sm:!text-xs"
+                aria-label="Disconnect wallet"
+                title="Disconnect wallet"
+                className="!h-8 !w-8 !p-0 !text-[10px]"
               >
-                <span className="hidden sm:inline">Disconnect</span>
-                <span className="sm:hidden">Exit</span>
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Disconnect</span>
               </Button>
             </>
           )}
